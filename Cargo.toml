@@ -1,0 +1,13 @@
+[package]
+name = "far1c"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+flate2 = "1.0"
+encoding_rs = "0.8"
+uuid = { version = "1.3", features = ["v4"] }
+widestring = "1.0"
