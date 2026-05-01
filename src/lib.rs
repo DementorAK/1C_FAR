@@ -2,10 +2,17 @@ pub mod base;
 pub mod far;
 pub mod v8_artifacts;
 
+mod version {
+    include!(concat!(env!("OUT_DIR"), "/version.rs"));
+}
+
 use crate::far::api::*;
 use crate::far::STARTUP_INFO;
 use std::ptr;
-use std::ffi::c_void;
+use std::fs::File;
+use std::panic;
+use crate::base::reader::FileReader;
+use crate::v8_artifacts::cf::Container;
 
 // Helper to define plugin GUID
 const PLUGIN_GUID: GUID = GUID {
@@ -23,83 +30,146 @@ const MENU_GUID: GUID = GUID {
 };
 
 #[no_mangle]
-pub unsafe extern "C" fn GetGlobalInfoW(info: *mut GlobalInfo) {
+pub unsafe extern "system" fn GetGlobalInfoW(info: *mut GlobalInfo) {
+    let _ = panic::catch_unwind(|| {
+        if info.is_null() {
+            return;
+        }
+        let info = &mut *info;
+        info.StructSize = std::mem::size_of::<GlobalInfo>();
+        info.MinFarVersion = VersionInfo { Major: 3, Minor: 0, Revision: 0, Build: 3000, Stage: 0 };
+        info.Version = VersionInfo { 
+            Major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap_or(0), 
+            Minor: env!("CARGO_PKG_VERSION_MINOR").parse().unwrap_or(0), 
+            Revision: version::BUILD_NUMBER, 
+            Build: env!("CARGO_PKG_VERSION_PATCH").parse().unwrap_or(0), 
+            Stage: 0 
+        };
+        // Explicitly copy GUID to avoid any alignment issues
+        unsafe {
+            std::ptr::copy_nonoverlapping(&PLUGIN_GUID, &mut info.Guid, 1);
+        }
+        
+        info.Title = Box::leak(to_wide("1C:Enterprise Artifacts").into_boxed_slice()).as_ptr();
+        info.Description = Box::leak(to_wide(env!("CARGO_PKG_DESCRIPTION")).into_boxed_slice()).as_ptr();
+        info.Author = Box::leak(to_wide(env!("CARGO_PKG_AUTHORS")).into_boxed_slice()).as_ptr();
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn SetStartupInfoW(info: *const PluginStartupInfo) {
+    let _ = panic::catch_unwind(|| {
+        if !info.is_null() {
+            STARTUP_INFO = Some(*info);
+        }
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn GetPluginInfoW(info: *mut PluginInfo) {
+    let _ = panic::catch_unwind(|| {
+        if info.is_null() {
+            return;
+        }
+        let info = &mut *info;
+        info.StructSize = std::mem::size_of::<PluginInfo>();
+        info.Flags = 0; // standard flags
+
+        // Command prefix for command line execution
+        info.CommandPrefix = Box::leak(to_wide(env!("PLUGIN_PREFIX")).into_boxed_slice()).as_ptr();
+
+        // Add to plugin menu (F11)
+        let menu_string = Box::leak(to_wide("1C:Enterprise Artifacts").into_boxed_slice()).as_ptr();
+        let strings_arr = Box::leak(Box::new([menu_string]));
+        
+        let guids_arr = Box::leak(Box::new([MENU_GUID]));
+
+        info.PluginMenu = PluginMenuItem {
+            Guids: guids_arr.as_ptr(),
+            Strings: strings_arr.as_ptr(),
+            Count: 1,
+        };
+        
+        // Empty disk menu and config menu
+        info.DiskMenu = PluginMenuItem { Guids: ptr::null(), Strings: ptr::null(), Count: 0 };
+        info.PluginConfig = PluginMenuItem { Guids: ptr::null(), Strings: ptr::null(), Count: 0 };
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn AnalyseW(info: *const AnalyseInfo) -> HANDLE {
     if info.is_null() {
-        return;
+        return ptr::null_mut();
     }
-    let info = &mut *info;
-    info.StructSize = std::mem::size_of::<GlobalInfo>();
-    info.MinFarVersion = VersionInfo { Major: 3, Minor: 0, Revision: 0, Build: 3000, Stage: 0 };
-    info.Version = VersionInfo { Major: 0, Minor: 1, Revision: 0, Build: 1, Stage: 0 };
-    info.Guid = PLUGIN_GUID;
-    
-    // We leak these strings because FAR expects them to be valid for the lifetime of the plugin
-    info.Title = Box::leak(to_wide("1C:Enterprise Artifacts (Rust)").into_boxed_slice()).as_ptr();
-    info.Description = Box::leak(to_wide("FAR Manager plugin for 1C:Enterprise artifacts").into_boxed_slice()).as_ptr();
-    info.Author = Box::leak(to_wide("1C_FAR Team").into_boxed_slice()).as_ptr();
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn SetStartupInfoW(info: *const PluginStartupInfo) {
-    if !info.is_null() {
-        STARTUP_INFO = Some(*info);
+    let info = &*info;
+    if info.FileName.is_null() {
+        return ptr::null_mut();
     }
-}
 
-#[no_mangle]
-pub unsafe extern "C" fn GetPluginInfoW(info: *mut PluginInfo) {
-    if info.is_null() {
-        return;
+    let mut len = 0;
+    while *info.FileName.offset(len) != 0 {
+        len += 1;
     }
-    let info = &mut *info;
-    info.StructSize = std::mem::size_of::<PluginInfo>();
-    info.Flags = 0; // standard flags
-
-    // Command prefix for command line execution
-    info.CommandPrefix = Box::leak(to_wide("1c").into_boxed_slice()).as_ptr();
-
-    // Add to plugin menu (F11)
-    let menu_string = Box::leak(to_wide("1C:Enterprise Artifacts").into_boxed_slice()).as_ptr();
-    let strings_arr = Box::leak(Box::new([menu_string]));
+    let path_wide = std::slice::from_raw_parts(info.FileName, len as usize);
+    let path = String::from_utf16_lossy(path_wide);
     
-    let guids_arr = Box::leak(Box::new([MENU_GUID]));
-
-    info.PluginMenu = PluginMenuItem {
-        Guids: guids_arr.as_ptr(),
-        Strings: strings_arr.as_ptr(),
-        Count: 1,
-    };
+    let path_lower = path.to_lowercase();
+    let recognized = path_lower.ends_with(".cf") || path_lower.ends_with(".epf") || path_lower.ends_with(".erf");
     
-    // Empty disk menu and config menu
-    info.DiskMenu = PluginMenuItem { Guids: ptr::null(), Strings: ptr::null(), Count: 0 };
-    info.PluginConfig = PluginMenuItem { Guids: ptr::null(), Strings: ptr::null(), Count: 0 };
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn AnalyseW(_info: *const AnalyseInfo) -> HANDLE {
-    // For MVP, if it gets here, we just accept files we know. We'll implement real logic later.
-    // Return null handle means we don't process it (for now to prevent FAR crashing if we don't handle OpenW properly)
+    if recognized {
+        let wide_path = to_wide(&path);
+        let handle = Box::into_raw(Box::new(wide_path)) as HANDLE;
+        return handle;
+    }
+    
     ptr::null_mut()
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn CloseAnalyseW(info: *const CloseAnalyseInfo) {
+    let _ = panic::catch_unwind(|| {
+        if info.is_null() {
+            return;
+        }
+        let info = &*info;
+        if !info.Handle.is_null() {
+            let _ = Box::from_raw(info.Handle as *mut Vec<u16>);
+        }
+    });
 }
 
 // Structure to represent our panel instance
 struct PluginPanel {
-    // In the future, this will hold state about the opened 1C artifact
+    path: String,
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn OpenW(info: *const OpenInfo) -> HANDLE {
-    if info.is_null() {
-        return ptr::null_mut();
-    }
-    
-    // For now, we always open a panel, regardless of where we were called from (F11, command line, etc.)
-    let panel = Box::new(PluginPanel {});
-    Box::into_raw(panel) as HANDLE
+pub unsafe extern "system" fn OpenW(info: *const OpenInfo) -> HANDLE {
+    panic::catch_unwind(|| {
+        if info.is_null() {
+            return ptr::null_mut();
+        }
+        let info = &*info;
+        
+        let mut path = String::new();
+        
+        // OPEN_ANALYSE is 9
+        if info.OpenFrom == 9 && info.Data != 0 {
+            let analyse_info = &*(info.Data as *const OpenAnalyseInfo);
+            if !analyse_info.Handle.is_null() {
+                let path_wide_ptr = analyse_info.Handle as *mut Vec<u16>;
+                let path_wide = &*path_wide_ptr;
+                path = String::from_utf16_lossy(path_wide.as_slice().strip_suffix(&[0]).unwrap_or(path_wide));
+            }
+        }
+        
+        let panel = Box::new(PluginPanel { path });
+        Box::into_raw(panel) as HANDLE
+    }).unwrap_or(ptr::null_mut())
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetOpenPanelInfoW(info: *mut GetOpenPanelInfo) {
+pub unsafe extern "system" fn GetOpenPanelInfoW(info: *mut GetOpenPanelInfo) {
     if info.is_null() {
         return;
     }
@@ -117,69 +187,101 @@ pub unsafe extern "C" fn GetOpenPanelInfoW(info: *mut GetOpenPanelInfo) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ClosePanelW(info: *const c_void) {
-    // info here is the handle we returned from OpenW
-    if !info.is_null() {
-        let _ = Box::from_raw(info as *mut PluginPanel);
-    }
+pub unsafe extern "system" fn ClosePanelW(info: *const ClosePanelInfo) {
+    let _ = panic::catch_unwind(|| {
+        if info.is_null() {
+            return;
+        }
+        let info = &*info;
+        if !info.hPanel.is_null() {
+            let _ = Box::from_raw(info.hPanel as *mut PluginPanel);
+        }
+    });
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetFindDataW(info: *mut GetFindDataInfo) -> IntPtr {
-    if info.is_null() {
-        return 0; // FALSE
-    }
-    let info = &mut *info;
+pub unsafe extern "system" fn GetFindDataW(info: *mut GetFindDataInfo) -> IntPtr {
+    panic::catch_unwind(|| {
+        if info.is_null() {
+            return 0; // FALSE
+        }
+        let info = &mut *info;
+        if info.hPanel.is_null() {
+            return 0;
+        }
+        let panel = &*(info.hPanel as *const PluginPanel);
 
-    // Create dummy files for the panel
-    let mut items = Vec::with_capacity(2);
-    
-    unsafe fn leak_wstr(s: &str) -> *const u16 {
-        Box::leak(to_wide(s).into_boxed_slice()).as_ptr()
-    }
+        if panel.path.is_empty() {
+            info.ItemsNumber = 0;
+            info.PanelItem = ptr::null_mut();
+            return 1;
+        }
 
-    let mut item1 = PluginPanelItem::default();
-    item1.FileName = leak_wstr("test_module.bsl");
-    item1.FileSize = 1024;
-    items.push(item1);
+        let file = match File::open(&panel.path) {
+            Ok(f) => f,
+            Err(_) => return 0,
+        };
 
-    let mut item2 = PluginPanelItem::default();
-    item2.FileName = leak_wstr("Forms");
-    item2.FileAttributes = 0x10; // FILE_ATTRIBUTE_DIRECTORY
-    items.push(item2);
+        let reader = match FileReader::new(file) {
+            Ok(r) => r,
+            Err(_) => return 0,
+        };
 
-    let items_boxed = items.into_boxed_slice();
-    let len = items_boxed.len();
-    let ptr = items_boxed.as_ptr();
-    
-    // We must leak the array itself so it stays valid until FreeFindDataW
-    std::mem::forget(items_boxed);
-    
-    // In this SDK version, PanelItem and ItemsNumber are fields we fill directly
-    info.PanelItem = ptr as *mut PluginPanelItem;
-    info.ItemsNumber = len;
+        let mut container = match Container::new(reader) {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
 
-    1 // TRUE
+        let mut items = Vec::new();
+        
+        unsafe fn leak_wstr(s: &str) -> *const u16 {
+            Box::leak(to_wide(s).into_boxed_slice()).as_ptr()
+        }
+
+        for row_res in container.rows() {
+            if let Ok(row) = row_res {
+                let mut item = PluginPanelItem::default();
+                item.FileName = leak_wstr(&row.id);
+                item.FileSize = row.data.len() as u64;
+                item.FileAttributes = 0x20; // FILE_ATTRIBUTE_ARCHIVE
+                items.push(item);
+            }
+        }
+
+        let items_boxed = items.into_boxed_slice();
+        let len = items_boxed.len();
+        let ptr = items_boxed.as_ptr();
+        
+        std::mem::forget(items_boxed);
+        
+        info.PanelItem = ptr as *mut PluginPanelItem;
+        info.ItemsNumber = len;
+
+        1 // TRUE
+    }).unwrap_or(0)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn FreeFindDataW(info: *const FreeFindDataInfo) {
-    if info.is_null() {
-        return;
-    }
-    let info = &*info;
-    if !info.PanelItem.is_null() && info.ItemsNumber > 0 {
-        let _items = Box::from_raw(std::slice::from_raw_parts_mut(info.PanelItem, info.ItemsNumber));
-    }
+pub unsafe extern "system" fn FreeFindDataW(info: *const FreeFindDataInfo) {
+    let _ = panic::catch_unwind(|| {
+        if info.is_null() {
+            return;
+        }
+        let info = &*info;
+        if !info.PanelItem.is_null() && info.ItemsNumber > 0 {
+            // Reconstruct the fat pointer to the boxed slice
+            let slice_ptr = std::ptr::slice_from_raw_parts_mut(info.PanelItem, info.ItemsNumber);
+            let _items = Box::from_raw(slice_ptr);
+        }
+    });
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetDirectoryW(info: *const SetDirectoryInfo) -> IntPtr {
-    if info.is_null() {
-        return 0; // FALSE
-    }
-    
-    // For the dummy implementation, we allow navigating everywhere.
-    // In the real one, we'll update the internal state of the panel.
-    1 // TRUE
+pub unsafe extern "system" fn SetDirectoryW(info: *const SetDirectoryInfo) -> IntPtr {
+    panic::catch_unwind(|| {
+        if info.is_null() {
+            return 0; // FALSE
+        }
+        1 // TRUE
+    }).unwrap_or(0)
 }

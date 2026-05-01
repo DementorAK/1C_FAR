@@ -119,6 +119,13 @@ pub struct OpenInfo {
 }
 
 #[repr(C)]
+pub struct OpenAnalyseInfo {
+    pub StructSize: usize,
+    pub Info: *const AnalyseInfo,
+    pub Handle: HANDLE,
+}
+
+#[repr(C)]
 pub struct AnalyseInfo {
     pub StructSize: usize,
     pub FileName: *const u16,
@@ -265,11 +272,25 @@ pub struct GetOpenPanelInfo {
     pub PanelModesArray: *const PanelMode,
     pub PanelModesNumber: usize,
     pub StartPanelMode: usize,
-    pub StartSortMode: usize,
-    pub StartSortOrder: usize,
+    pub StartSortMode: u32,
+    pub StartSortOrder: u32,
     pub KeyBar: *const KeyBarTitles,
     pub ShortcutData: *const u16,
     pub FreeSize: u64,
     pub UserData: UserDataItem,
+    pub Instance: *mut c_void,
+}
+
+#[repr(C)]
+pub struct CloseAnalyseInfo {
+    pub StructSize: usize,
+    pub Handle: HANDLE,
+    pub Instance: *mut c_void,
+}
+
+#[repr(C)]
+pub struct ClosePanelInfo {
+    pub StructSize: usize,
+    pub hPanel: HANDLE,
     pub Instance: *mut c_void,
 }
