@@ -14,6 +14,7 @@ use crate::v8_artifacts::vfs_builder::build_vfs;
 use std::ptr;
 use std::fs::File;
 use std::panic;
+use log::info;
 
 const PLUGIN_GUID: GUID = GUID {
     Data1: 0x1c1c1c1c,
@@ -60,8 +61,20 @@ pub unsafe extern "system" fn SetStartupInfoW(info: *const PluginStartupInfo) {
     let _ = panic::catch_unwind(|| {
         if !info.is_null() {
             STARTUP_INFO = Some(*info);
+            // Initialize logger
+            #[cfg(target_os = "windows")]
+            let _ = windebug_logger::init();
+            #[cfg(not(target_os = "windows"))]
+            let _ = simple_logger::init();
+            
+            info!("1C:Enterprise Artifacts plugin version {} loaded", env!("CARGO_PKG_VERSION"));
         }
     });
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn ExitFARW(_info: *const ExitInfo) {
+    info!("1C:Enterprise Artifacts plugin unloaded");
 }
 
 #[no_mangle]
@@ -115,6 +128,7 @@ pub unsafe extern "system" fn AnalyseW(info: *const AnalyseInfo) -> HANDLE {
         || path_lower.ends_with(".cfe"); // FR-001: .cfe support
     
     if recognized {
+        info!("Artifact recognized: {}", path);
         let wide_path = to_wide(&path);
         let handle = Box::into_raw(Box::new(wide_path)) as HANDLE;
         return handle;
@@ -231,7 +245,8 @@ pub unsafe extern "system" fn ClosePanelW(info: *const ClosePanelInfo) {
         }
         let info = &*info;
         if !info.hPanel.is_null() {
-            let _ = Box::from_raw(info.hPanel as *mut PluginPanel);
+            let panel = Box::from_raw(info.hPanel as *mut PluginPanel);
+            info!("Closing panel for: {}", panel.path);
         }
     });
 }
