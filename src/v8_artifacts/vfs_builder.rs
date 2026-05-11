@@ -7,16 +7,18 @@ use crate::base::parser::{StructParser, strip_quotes};
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
 /// A single entry in the virtual filesystem.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum VfsEntry {
     File {
         name: String,
         data: Vec<u8>,
         is_protected: bool,
+        origin_row_id: Option<String>,
     },
     Dir {
         name: String,
         children: Vec<VfsEntry>,
+        origin_row_id: Option<String>,
     },
 }
 
@@ -69,6 +71,17 @@ impl VfsEntry {
             }
         }
         Ok(())
+    }
+
+    /// Update file data. Returns true if successful (entry is a file).
+    pub fn update_file_data(&mut self, new_data: Vec<u8>) -> bool {
+        match self {
+            VfsEntry::File { data, .. } => {
+                *data = new_data;
+                true
+            }
+            _ => false,
+        }
     }
 }
 
@@ -288,7 +301,9 @@ fn build_subordinate_entries(
                         name: "Module.bsl".to_string(),
                         data: module_data,
                         is_protected: is_prot,
+                        origin_row_id: Some(body_key.clone()),
                     }],
+                    origin_row_id: Some(inst_uuid.clone()),
                 });
             } else if group.display_name == "Templates" {
                 // Template: file with raw data
@@ -297,6 +312,7 @@ fn build_subordinate_entries(
                     name,
                     data,
                     is_protected: false,
+                    origin_row_id: Some(body_key.clone()),
                 });
             } else {
                 // Other subordinate types: show as file/dir depending on body presence
@@ -305,6 +321,7 @@ fn build_subordinate_entries(
                     name,
                     data,
                     is_protected: false,
+                    origin_row_id: Some(body_key.clone()),
                 });
             }
         }
@@ -313,6 +330,7 @@ fn build_subordinate_entries(
             entries.push(VfsEntry::Dir {
                 name: group.display_name.clone(),
                 children,
+                origin_row_id: None,
             });
         }
     }
@@ -347,6 +365,8 @@ fn build_single_object_vfs(
                     name: "ObjectModule.bsl".to_string(),
                     is_protected: is_protected_module(&text),
                     data: text,
+                    origin_row_id: module_uuid.clone().map(|u| format!("{}.0", u))
+                        .or_else(|| Some(format!("{}.0", root_uuid))),
                 });
             }
         }
@@ -364,6 +384,7 @@ fn build_single_object_vfs(
                     name: id.clone(),
                     data: data.clone(),
                     is_protected: is_protected_module(data),
+                    origin_row_id: Some(id.clone()),
                 });
             }
         }
@@ -426,6 +447,8 @@ fn build_cf_object_vfs(
                         name: "ObjectModule.bsl".to_string(),
                         is_protected: is_protected_module(&text),
                         data: text,
+                        origin_row_id: module_uuid.clone().map(|u| format!("{}.0", u))
+                            .or_else(|| Some(format!("{}.0", obj_uuid))),
                     });
                 }
             }
@@ -449,6 +472,7 @@ fn build_cf_object_vfs(
                     name: obj_uuid.to_string(),
                     data: data.clone(),
                     is_protected: is_protected_module(data),
+                    origin_row_id: Some(obj_uuid.to_string()),
                 });
                 added.insert(obj_uuid.to_string());
             }
@@ -458,6 +482,7 @@ fn build_cf_object_vfs(
                     name: obj_0.clone(),
                     data: data.clone(),
                     is_protected: is_protected_module(data),
+                    origin_row_id: Some(obj_0.clone()),
                 });
                 added.insert(obj_0);
             }
@@ -468,6 +493,7 @@ fn build_cf_object_vfs(
                             name: muid.clone(),
                             data: data.clone(),
                             is_protected: is_protected_module(data),
+                            origin_row_id: Some(muid.clone()),
                         });
                         added.insert(muid.clone());
                     }
@@ -476,9 +502,10 @@ fn build_cf_object_vfs(
                 if !added.contains(&muid_0) {
                     if let Some(data) = rows_map.get(&muid_0) {
                         children.push(VfsEntry::File {
-                            name: muid_0,
+                            name: muid_0.clone(),
                             data: data.clone(),
                             is_protected: is_protected_module(data),
+                            origin_row_id: Some(muid_0),
                         });
                     }
                 }
@@ -530,6 +557,7 @@ fn build_configuration_vfs(
 
                         obj_entries.push(VfsEntry::Dir {
                             name: obj_name, children: obj_children,
+                            origin_row_id: Some(obj_uuid.clone()),
                         });
                     }
 
@@ -537,6 +565,7 @@ fn build_configuration_vfs(
                         vfs.push(VfsEntry::Dir {
                             name: group.display_name.clone(),
                             children: obj_entries,
+                            origin_row_id: None,
                         });
                     }
                 }
@@ -552,6 +581,7 @@ fn build_configuration_vfs(
                     name: id.clone(),
                     data: data.clone(),
                     is_protected: is_protected_module(data),
+                    origin_row_id: Some(id.clone()),
                 });
             }
         }
@@ -656,6 +686,7 @@ fn build_extension_vfs(
 
                                 obj_entries.push(VfsEntry::Dir {
                                     name: obj_name, children: obj_children,
+                                    origin_row_id: Some(obj_uuid.clone()),
                                 });
                             }
                             if !obj_entries.is_empty() {
@@ -672,7 +703,7 @@ fn build_extension_vfs(
 
     // Build VFS from grouped entries
     let mut vfs: Vec<VfsEntry> = groups.into_iter()
-        .map(|(name, children)| VfsEntry::Dir { name, children })
+        .map(|(name, children)| VfsEntry::Dir { name, children, origin_row_id: None })
         .collect();
 
     // Sort groups alphabetically for consistent display
@@ -684,6 +715,7 @@ fn build_extension_vfs(
             if !utility_rows.contains(&id.as_str()) && !id.ends_with(".0") {
                 vfs.push(VfsEntry::File {
                     name: id.clone(), data: data.clone(), is_protected: false,
+                    origin_row_id: Some(id.clone()),
                 });
             }
         }

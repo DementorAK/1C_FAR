@@ -49,6 +49,8 @@ pub struct PluginPanel {
     pub current_dir: Vec<String>,
     /// Just the filename (e.g., "test.epf") for panel title.
     pub host_filename: String,
+    /// Has the content been modified?
+    pub is_modified: bool,
 }
 
 impl PluginPanel {
@@ -65,6 +67,7 @@ impl PluginPanel {
             vfs: Vec::new(),
             current_dir: Vec::new(),
             host_filename,
+            is_modified: false,
         }
     }
 
@@ -133,6 +136,31 @@ impl PluginPanel {
     /// Find an entry in the current virtual directory by name.
     pub fn find_entry_in_current_dir(&self, name: &str) -> Option<&VfsEntry> {
         self.resolve_current_dir().iter().find(|e| e.name() == name)
+    }
+
+    /// Get the mutable entries in the current virtual directory.
+    pub fn resolve_current_dir_mut(&mut self) -> &mut [VfsEntry] {
+        let mut current: &mut [VfsEntry] = &mut self.vfs;
+
+        for dir_name in self.current_dir.iter() {
+            if let Some(pos) = current.iter().position(|e| e.name() == dir_name) {
+                match &mut current[pos] {
+                    VfsEntry::Dir { children, .. } => {
+                        current = children;
+                    }
+                    _ => return &mut [],
+                }
+            } else {
+                return &mut [];
+            }
+        }
+
+        current
+    }
+
+    /// Find a mutable entry in the current virtual directory by name.
+    pub fn find_entry_in_current_dir_mut(&mut self, name: &str) -> Option<&mut VfsEntry> {
+        self.resolve_current_dir_mut().iter_mut().find(|e| e.name() == name)
     }
 }
 

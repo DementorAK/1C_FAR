@@ -372,3 +372,98 @@ pub unsafe extern "system" fn GetFilesW(info: *const GetFilesInfo) -> IntPtr {
         1
     }).unwrap_or(0)
 }
+
+#[no_mangle]
+pub unsafe extern "system" fn PutFilesW(info: *const PutFilesInfo) -> IntPtr {
+    panic::catch_unwind(|| {
+        if info.is_null() { return 0; }
+        let info = &*info;
+        if info.hPanel.is_null() { return 0; }
+        let panel = &mut *(info.hPanel as *mut PluginPanel);
+        
+        let items = std::slice::from_raw_parts(info.PanelItem, info.ItemsNumber);
+        
+        for item in items {
+            let mut nlen = 0;
+            while *item.FileName.offset(nlen) != 0 {
+                nlen += 1;
+            }
+            let name_wide = std::slice::from_raw_parts(item.FileName, nlen as usize);
+            let name = String::from_utf16_lossy(name_wide);
+            
+            let mut dlen = 0;
+            while *info.SrcPath.offset(dlen) != 0 {
+                dlen += 1;
+            }
+            let src_path_wide = std::slice::from_raw_parts(info.SrcPath, dlen as usize);
+            let src_path_str = String::from_utf16_lossy(src_path_wide);
+            let src_base = std::path::Path::new(&src_path_str);
+            let src_file_path = src_base.join(&name);
+
+            if let Ok(new_data) = std::fs::read(&src_file_path) {
+                if let Some(entry) = panel.find_entry_in_current_dir_mut(&name) {
+                    if entry.update_file_data(new_data) {
+                        panel.is_modified = true;
+                    }
+                }
+            }
+        }
+        
+        1
+    }).unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "system" fn ProcessPanelEventW(info: *const ProcessPanelEventInfo) -> IntPtr {
+    panic::catch_unwind(|| {
+        if info.is_null() { return 0; }
+        let info = &*info;
+        if info.hPanel.is_null() { return 0; }
+        let panel = &mut *(info.hPanel as *mut PluginPanel);
+        
+        match info.Event {
+            e if e == FE_CLOSE as isize => {
+                if panel.is_modified {
+                    let msg_title = crate::far::api::to_wide("Сохранение");
+                    let msg_text = crate::far::api::to_wide("Состав контейнера был изменен. Сохранить?");
+                    let btn_yes = crate::far::api::to_wide("Да");
+                    let btn_no = crate::far::api::to_wide("Нет");
+                    let btn_cancel = crate::far::api::to_wide("Отмена");
+
+                    let items = [
+                        msg_title.as_ptr(),
+                        msg_text.as_ptr(),
+                        btn_yes.as_ptr(),
+                        btn_no.as_ptr(),
+                        btn_cancel.as_ptr(),
+                    ];
+
+                    if let Some(psi) = crate::far::STARTUP_INFO {
+                        if let Some(message_fn) = psi.Message {
+                            let res = message_fn(
+                                &PLUGIN_GUID,
+                                ptr::null(),
+                                FMSG_WARNING,
+                                ptr::null(),
+                                items.as_ptr(),
+                                items.len(),
+                                3 // Buttons
+                            );
+
+                            match res {
+                                0 | 1 => { // Да | Нет
+                                    return 0; // Close
+                                }
+                                _ => { // Отмена / Esc
+                                    return 1; // Abort close
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        0
+    }).unwrap_or(0)
+}
