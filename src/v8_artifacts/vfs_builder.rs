@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::v8_artifacts::container::{Container, SIG};
+use crate::v8_artifacts::container::Container;
 use crate::v8_artifacts::uuids;
 use crate::base::reader::StringReader;
 use crate::base::parser::{StructParser, strip_quotes};
@@ -14,6 +14,7 @@ pub enum VfsEntry {
         data: Vec<u8>,
         is_protected: bool,
         origin_row_id: Option<String>,
+        original_container: Option<Vec<u8>>,
     },
     Dir {
         name: String,
@@ -99,17 +100,18 @@ fn data_to_string(data: &[u8]) -> Option<String> {
 }
 
 /// Extract the text module from a row's .0 data (may be nested container).
-fn extract_module_text(data: &[u8]) -> Option<Vec<u8>> {
+/// Returns (text_data, Option<full_container_data>).
+fn extract_module_text(data: &[u8]) -> Option<(Vec<u8>, Option<Vec<u8>>)> {
     if data.is_empty() { return None; }
     if data.len() >= 4 {
         if let Ok(bytes) = data[0..4].try_into() {
             let sig = u32::from_le_bytes(bytes);
-            if sig == SIG {
+            if sig == crate::v8_artifacts::container::SIG || (sig as u64) == crate::v8_artifacts::container::SIG64 {
                 let reader = StringReader::new(data.to_vec());
                 if let Ok(mut container) = Container::new(reader, 0) {
                     for row_res in container.rows() {
                         if let Ok(row) = row_res {
-                            if row.id == "text" { return Some(row.data); }
+                            if row.id == "text" { return Some((row.data, Some(data.to_vec()))); }
                         }
                     }
                 }
@@ -117,7 +119,7 @@ fn extract_module_text(data: &[u8]) -> Option<Vec<u8>> {
             }
         }
     }
-    Some(data.to_vec())
+    Some((data.to_vec(), None))
 }
 
 /// Extract name from a subordinate object header.
@@ -292,8 +294,7 @@ fn build_subordinate_entries(
                 .unwrap_or_else(|| short_uuid(inst_uuid));
 
             if group.display_name == "Forms" {
-                // Form: directory with Module.bsl inside
-                let module_data = body.map(|b| b.to_vec()).unwrap_or_default();
+                let (module_data, orig_cont) = body.and_then(|b| extract_module_text(b)).unwrap_or((Vec::new(), None));
                 let is_prot = is_protected_module(&module_data);
                 children.push(VfsEntry::Dir {
                     name,
@@ -302,6 +303,7 @@ fn build_subordinate_entries(
                         data: module_data,
                         is_protected: is_prot,
                         origin_row_id: Some(body_key.clone()),
+                        original_container: orig_cont,
                     }],
                     origin_row_id: Some(inst_uuid.clone()),
                 });
@@ -313,6 +315,7 @@ fn build_subordinate_entries(
                     data,
                     is_protected: false,
                     origin_row_id: Some(body_key.clone()),
+                    original_container: None,
                 });
             } else {
                 // Other subordinate types: show as file/dir depending on body presence
@@ -322,6 +325,7 @@ fn build_subordinate_entries(
                     data,
                     is_protected: false,
                     origin_row_id: Some(body_key.clone()),
+                    original_container: None,
                 });
             }
         }
@@ -359,7 +363,7 @@ fn build_single_object_vfs(
         .or_else(|| rows_map.get(&format!("{}.0", root_uuid)));
 
     if let Some(body) = body_data {
-        if let Some(text) = extract_module_text(body) {
+        if let Some((text, orig_cont)) = extract_module_text(body) {
             if has_real_content(&text) {
                 vfs.push(VfsEntry::File {
                     name: "ObjectModule.bsl".to_string(),
@@ -367,6 +371,7 @@ fn build_single_object_vfs(
                     data: text,
                     origin_row_id: module_uuid.clone().map(|u| format!("{}.0", u))
                         .or_else(|| Some(format!("{}.0", root_uuid))),
+                    original_container: orig_cont,
                 });
             }
         }
@@ -385,6 +390,7 @@ fn build_single_object_vfs(
                     data: data.clone(),
                     is_protected: is_protected_module(data),
                     origin_row_id: Some(id.clone()),
+                    original_container: None,
                 });
             }
         }
@@ -441,7 +447,7 @@ fn build_cf_object_vfs(
             .or_else(|| rows_map.get(&format!("{}.0", obj_uuid)));
 
         if let Some(body) = body_data {
-            if let Some(text) = extract_module_text(body) {
+            if let Some((text, orig_cont)) = extract_module_text(body) {
                 if has_real_content(&text) {
                     children.push(VfsEntry::File {
                         name: "ObjectModule.bsl".to_string(),
@@ -449,6 +455,7 @@ fn build_cf_object_vfs(
                         data: text,
                         origin_row_id: module_uuid.clone().map(|u| format!("{}.0", u))
                             .or_else(|| Some(format!("{}.0", obj_uuid))),
+                        original_container: orig_cont,
                     });
                 }
             }
@@ -473,27 +480,32 @@ fn build_cf_object_vfs(
                     data: data.clone(),
                     is_protected: is_protected_module(data),
                     origin_row_id: Some(obj_uuid.to_string()),
+                    original_container: None,
                 });
                 added.insert(obj_uuid.to_string());
             }
-            let obj_0 = format!("{}.0", obj_uuid);
-            if let Some(data) = rows_map.get(&obj_0) {
+            let obj_0_key = format!("{}.0", obj_uuid);
+            if let Some(data) = rows_map.get(&obj_0_key) {
+                let (module_data, orig_cont) = extract_module_text(data).unwrap_or((data.clone(), None));
                 children.push(VfsEntry::File {
-                    name: obj_0.clone(),
-                    data: data.clone(),
+                    name: obj_0_key.clone(),
+                    data: module_data,
                     is_protected: is_protected_module(data),
-                    origin_row_id: Some(obj_0.clone()),
+                    origin_row_id: Some(obj_0_key.clone()),
+                    original_container: orig_cont,
                 });
-                added.insert(obj_0);
+                added.insert(obj_0_key);
             }
             if let Some(muid) = module_uuid {
                 if !added.contains(&muid) {
                     if let Some(data) = rows_map.get(&muid) {
+                        let (mdata, orig_cont) = extract_module_text(data).unwrap_or((data.clone(), None));
                         children.push(VfsEntry::File {
-                            name: muid.clone(),
-                            data: data.clone(),
-                            is_protected: is_protected_module(data),
-                            origin_row_id: Some(muid.clone()),
+                            name: format!("{}.0", muid),
+                            data: mdata.clone(),
+                            is_protected: is_protected_module(&mdata),
+                            origin_row_id: Some(format!("{}.0", muid)),
+                            original_container: orig_cont,
                         });
                         added.insert(muid.clone());
                     }
@@ -506,6 +518,7 @@ fn build_cf_object_vfs(
                             data: data.clone(),
                             is_protected: is_protected_module(data),
                             origin_row_id: Some(muid_0),
+                            original_container: None,
                         });
                     }
                 }
@@ -580,8 +593,9 @@ fn build_configuration_vfs(
                 vfs.push(VfsEntry::File {
                     name: id.clone(),
                     data: data.clone(),
-                    is_protected: is_protected_module(data),
+                    is_protected: false,
                     origin_row_id: Some(id.clone()),
+                    original_container: None,
                 });
             }
         }
@@ -628,7 +642,7 @@ fn is_configuration_format(rows_map: &HashMap<String, Vec<u8>>, root_uuid: &str)
 /// - EPF/ERF: single object with subordinate Forms/Templates (has "root" row)
 /// - CF: configuration with multiple top-level metadata groups (has "root" row, multiple groups)
 /// - CFE: extension with flat object list (has "configinfo" row, no "root")
-pub fn build_vfs(rows_map: HashMap<String, Vec<u8>>) -> Result<Vec<VfsEntry>, BuildVfsError> {
+pub fn build_vfs(rows_map: &HashMap<String, Vec<u8>>) -> Result<Vec<VfsEntry>, BuildVfsError> {
     // CFE detection: has "configinfo" but no "root"
     if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
         return build_extension_vfs(&rows_map);
@@ -716,6 +730,7 @@ fn build_extension_vfs(
                 vfs.push(VfsEntry::File {
                     name: id.clone(), data: data.clone(), is_protected: false,
                     origin_row_id: Some(id.clone()),
+                    original_container: None,
                 });
             }
         }

@@ -2,6 +2,7 @@
 
 pub mod container;
 pub mod vfs_builder;
+pub mod writer;
 pub mod uuids;
 #[cfg(test)]
 mod tests;

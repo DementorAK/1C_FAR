@@ -96,7 +96,7 @@ pub fn read_page_header<R: V8Reader>(reader: &mut R, is_64bit: bool) -> io::Resu
 
 pub struct Container<R: V8Reader> {
     pub reader: R,
-    pointers: Vec<u64>,
+    pub pointers: Vec<u64>,
     pub is_64bit: bool,
     pub offset: u64,
     pub size: u64,
@@ -258,75 +258,13 @@ impl<'a, R: V8Reader> Iterator for RowIterator<'a, R> {
     }
 }
 
-pub fn read_all_rows<R: V8Reader>(mut reader: R, file_size: u64) -> io::Result<std::collections::HashMap<String, Vec<u8>>> {
-    let mut all_rows = std::collections::HashMap::new();
-    let mut offset = 0;
-    
-    // Read the whole file into memory for fast scanning of signatures
-    reader.set_pos(0)?;
-    let mut full_data = vec![0u8; file_size as usize];
-    reader.read_exact(&mut full_data)?;
-    
-    while offset < file_size {
-        // Try to parse a container at `offset`
-        // We only attempt if we see a valid signature
-        let mut found_sig = false;
-        while offset <= file_size - 8 {
-            let p32 = u32::from_le_bytes(full_data[offset as usize..offset as usize + 4].try_into().unwrap());
-            let p64 = u64::from_le_bytes(full_data[offset as usize..offset as usize + 8].try_into().unwrap());
-            if p32 == SIG || p64 == SIG64 {
-                // Heuristic: check if the page_size looks reasonable (e.g. 512, 1024, 4096, 65536)
-                // Actually, just try to parse the container
-                found_sig = true;
-                break;
-            }
-            offset += 1;
-        }
-        
-        if !found_sig {
-            break;
-        }
-        
-        // We found a signature at `offset`. Let's try to parse the container.
-        let clone_reader = crate::base::reader::StringReader::new(full_data.clone());
-        match Container::new(clone_reader, offset) {
-            Ok(container) => {
-                let mut stack = vec![container];
-                while let Some(mut current_container) = stack.pop() {
-                    for row_res in current_container.rows() {
-                        if let Ok(row) = row_res {
-                            if row.data.len() >= 8 {
-                                let p32 = u32::from_le_bytes(row.data[0..4].try_into().unwrap());
-                                let p64 = u64::from_le_bytes(row.data[0..8].try_into().unwrap());
-                                if p32 == SIG || p64 == SIG64 {
-                                    let nested_reader = crate::base::reader::StringReader::new(row.data.clone());
-                                    if let Ok(nested_container) = Container::new(nested_reader, 0) {
-                                        stack.push(nested_container);
-                                    }
-                                }
-                            }
-                            
-                            // Insert the row itself (whether it's a container or not)
-                            all_rows.insert(row.id.clone(), row.data);
-                        }
-                    }
-                }
-            }
-            Err(_e) => {
-            }
-        }
-        
-        // Advance offset. Since we don't know the exact size of the container,
-        // we'll just skip the signature and keep scanning. The next valid signature
-        // won't appear inside compressed data, because compressed data doesn't have 
-        // 8-byte boundaries aligned perfectly, and Container blocks themselves are handled.
-        // Wait, what if `SIG` or `SIG64` appears inside the Container's data naturally?
-        // Actually, the easiest way to avoid re-parsing inside the same container is to 
-        // advance offset by a decent amount, or better: just let `Container` parse, 
-        // and if it succeeds, advance by some minimum container size, e.g., 64 bytes.
-        offset += 16;
+pub fn read_container_rows<R: V8Reader>(reader: R, offset: u64) -> io::Result<std::collections::HashMap<String, (Vec<u8>, bool)>> {
+    let mut container = Container::new(reader, offset)?;
+    let mut rows = std::collections::HashMap::new();
+    for row_res in container.rows() {
+        let row = row_res?;
+        rows.insert(row.id, (row.data, row.is_packed));
     }
-    
-    Ok(all_rows)
+    Ok(rows)
 }
 

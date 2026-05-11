@@ -10,6 +10,17 @@ pub fn inflate(data: &[u8]) -> io::Result<Vec<u8>> {
     Ok(decoded_data)
 }
 
+/// Deflates raw data.
+pub fn deflate(data: &[u8]) -> io::Result<Vec<u8>> {
+    use flate2::write::DeflateEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+
+    let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(data)?;
+    encoder.finish()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

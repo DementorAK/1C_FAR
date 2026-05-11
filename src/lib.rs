@@ -12,8 +12,9 @@ use crate::far::panels::{PluginPanel, FileType};
 use crate::base::reader::FileReader;
 use crate::v8_artifacts::vfs_builder::build_vfs;
 use std::ptr;
-use std::fs::File;
 use std::panic;
+use std::fs::File;
+use std::collections::HashMap;
 use log::info;
 
 const PLUGIN_GUID: GUID = GUID {
@@ -186,13 +187,27 @@ pub unsafe extern "system" fn OpenW(info: *const OpenInfo) -> HANDLE {
         // Build VFS tree for EPF/ERF
         match File::open(&panel.path) {
             Ok(file) => {
-                let file_size = file.metadata().unwrap().len();
                 match FileReader::new(file) {
-                    Ok(reader) => {
-                        match crate::v8_artifacts::container::read_all_rows(reader, file_size) {
-                            Ok(rows_map) => {
-                                if let Ok(vfs) = build_vfs(rows_map) {
+                    Ok(mut reader) => {
+                        // Read header to preserve page_size and bitness
+                        if let Ok(header) = crate::v8_artifacts::container::read_image_header(&mut reader, 0) {
+                            panel.page_size = header.page_size;
+                            panel.is_64bit = header.header_size == 20;
+                        }
+
+                        match crate::v8_artifacts::container::read_container_rows(reader, 0) {
+                            Ok(rows) => {
+                                let mut rows_map = HashMap::new();
+                                let mut packed_map = HashMap::new();
+                                for (id, (data, packed)) in rows {
+                                    rows_map.insert(id.clone(), data);
+                                    packed_map.insert(id, packed);
+                                }
+
+                                if let Ok(vfs) = build_vfs(&rows_map) {
                                     panel.vfs = vfs;
+                                    panel.rows_map = rows_map;
+                                    panel.packed_map = packed_map;
                                 }
                             }
                             Err(_) => {}
@@ -451,7 +466,14 @@ pub unsafe extern "system" fn ProcessPanelEventW(info: *const ProcessPanelEventI
                             );
 
                             match res {
-                                0 | 1 => { // Да | Нет
+                                0 => { // Да
+                                    if let Err(e) = panel.commit_changes() {
+                                        info!("Failed to save changes: {}", e);
+                                        return 1; // Stay in panel
+                                    }
+                                    return 0; // Close
+                                }
+                                1 => { // Нет
                                     return 0; // Close
                                 }
                                 _ => { // Отмена / Esc
