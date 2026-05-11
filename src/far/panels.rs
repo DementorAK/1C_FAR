@@ -129,6 +129,11 @@ impl PluginPanel {
     pub fn panel_title(&self) -> String {
         format!(" FAR 1C:{}:{} ", self.file_type.as_str(), self.host_filename)
     }
+
+    /// Find an entry in the current virtual directory by name.
+    pub fn find_entry_in_current_dir(&self, name: &str) -> Option<&VfsEntry> {
+        self.resolve_current_dir().iter().find(|e| e.name() == name)
+    }
 }
 
 /// Convert VFS entries to FAR PluginPanelItems.

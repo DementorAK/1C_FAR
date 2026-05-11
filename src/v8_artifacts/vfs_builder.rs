@@ -51,6 +51,25 @@ impl VfsEntry {
             _ => None,
         }
     }
+
+    /// Recursively extract the entry to the given physical path.
+    pub fn extract_to(&self, dest_path: &std::path::Path) -> std::io::Result<()> {
+        match self {
+            VfsEntry::File { data, .. } => {
+                std::fs::write(dest_path, data)?;
+            }
+            VfsEntry::Dir { children, .. } => {
+                if !dest_path.exists() {
+                    std::fs::create_dir_all(dest_path)?;
+                }
+                for child in children {
+                    let child_path = dest_path.join(child.name());
+                    child.extract_to(&child_path)?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------

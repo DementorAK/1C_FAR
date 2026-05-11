@@ -326,3 +326,49 @@ pub unsafe extern "system" fn SetDirectoryW(info: *const SetDirectoryInfo) -> In
         }
     }).unwrap_or(0)
 }
+
+#[no_mangle]
+pub unsafe extern "system" fn GetFilesW(info: *const GetFilesInfo) -> IntPtr {
+    panic::catch_unwind(|| {
+        if info.is_null() {
+            return 0;
+        }
+        let info = &*info;
+        if info.hPanel.is_null() {
+            return 0;
+        }
+
+        let panel = &*(info.hPanel as *const PluginPanel);
+        
+        let mut len = 0;
+        while *info.DestPath.offset(len) != 0 {
+            len += 1;
+        }
+        let dest_path_wide = std::slice::from_raw_parts(info.DestPath, len as usize);
+        let dest_path_str = String::from_utf16_lossy(dest_path_wide);
+        let dest_base = std::path::Path::new(&dest_path_str);
+
+        let items = std::slice::from_raw_parts(info.PanelItem, info.ItemsNumber);
+        
+        for item in items {
+            let mut nlen = 0;
+            while *item.FileName.offset(nlen) != 0 {
+                nlen += 1;
+            }
+            let name_wide = std::slice::from_raw_parts(item.FileName, nlen as usize);
+            let name = String::from_utf16_lossy(name_wide);
+            
+            if let Some(entry) = panel.find_entry_in_current_dir(&name) {
+                let dest_item_path = dest_base.join(&name);
+                if let Err(e) = entry.extract_to(&dest_item_path) {
+                    info!("Failed to extract {}: {}", name, e);
+                    return 0;
+                }
+            } else {
+                return 0;
+            }
+        }
+
+        1
+    }).unwrap_or(0)
+}
