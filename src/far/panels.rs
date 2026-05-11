@@ -3,6 +3,8 @@ use crate::far::api::*;
 use std::collections::HashMap;
 use std::io;
 use crate::v8_artifacts::writer::ContainerWriter;
+use crate::far::settings::PluginSettings;
+use chrono::Local;
 
 /// Supported artifact types.
 #[derive(Debug, Clone, Copy)]
@@ -62,6 +64,8 @@ pub struct PluginPanel {
     pub page_size: u32,
     /// Is the artifact using 64-bit format?
     pub is_64bit: bool,
+    /// Plugin settings.
+    pub settings: PluginSettings,
 }
 
 impl PluginPanel {
@@ -83,6 +87,7 @@ impl PluginPanel {
             packed_map: HashMap::new(),
             page_size: 512,
             is_64bit: false,
+            settings: PluginSettings::load(),
         }
     }
 
@@ -179,15 +184,27 @@ impl PluginPanel {
     }
 
     /// Commit memory changes to disk artifact.
-    /// Performs backup (.bak) before writing.
     pub fn commit_changes(&mut self) -> io::Result<()> {
         if !self.is_modified {
             return Ok(());
         }
 
-        // 1. Create backup
-        let bak_path = format!("{}.bak", self.path);
-        std::fs::copy(&self.path, &bak_path)?;
+        // 1. Create backup if enabled
+        if self.settings.create_backup {
+            let path = std::path::Path::new(&self.path);
+            let stem = path.file_stem().map(|s| s.to_string_lossy()).unwrap_or_default();
+            let extension = path.extension().map(|e| e.to_string_lossy()).unwrap_or_default();
+            let timestamp = Local::now().format("%Y%m%d-%H%M%S").to_string();
+            
+            let bak_name = if extension.is_empty() {
+                format!("{}.{}", stem, timestamp)
+            } else {
+                format!("{}.{}.{}", stem, timestamp, extension)
+            };
+            
+            let bak_path = path.with_file_name(bak_name);
+            std::fs::copy(&self.path, &bak_path)?;
+        }
 
         // 2. Synchronize VFS modifications back to rows_map
         self.sync_vfs_to_rows();

@@ -2,5 +2,6 @@
 
 pub mod api;
 pub mod panels;
+pub mod settings;
 
 pub static mut STARTUP_INFO: Option<api::PluginStartupInfo> = None;
