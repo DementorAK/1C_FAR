@@ -150,7 +150,7 @@ impl PluginPanel {
 
     /// Build the panel title per FR-003: "FAR 1C:<TYPE>:<FileName>"
     pub fn panel_title(&self) -> String {
-        format!(" FAR 1C:{}:{} ", self.file_type.as_str(), self.host_filename)
+        format!("FAR 1C:{}:{}", self.file_type.as_str(), self.host_filename)
     }
 
     /// Find an entry in the current virtual directory by name.
@@ -224,7 +224,16 @@ impl PluginPanel {
             full_rows.insert(id.clone(), (data.clone(), is_packed));
         }
         
-        writer_logic.write(&mut buffer, &full_rows)?;
+        let host_name = self.host_filename.clone();
+        writer_logic.write(&mut buffer, &full_rows, Some(|current, total| {
+            crate::far::ui::show_progress(
+                &crate::far::lang::get_msg(crate::far::lang::Msg::SavingTitle),
+                &host_name,
+                current,
+                total
+            );
+        }))?;
+        crate::far::ui::finish_progress();
 
         // Write to temp file then rename (atomic swap)
         let tmp_path = format!("{}.tmp", self.path);
@@ -267,7 +276,7 @@ fn sync_nodes_to_map(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>
                             writer.pad_pt_to_page = false;
                             writer.revision = 6;
                             let mut buffer = Vec::new();
-                            if let Ok(_) = writer.write(&mut buffer, &nested_rows) {
+                            if let Ok(_) = writer.write(&mut buffer, &nested_rows, None::<fn(usize, usize)>) {
                                 final_data = buffer;
                             }
                         }

@@ -7,7 +7,8 @@ mod version {
 }
 
 use crate::far::api::*;
-use crate::far::STARTUP_INFO;
+use crate::far::{STARTUP_INFO, PLUGIN_GUID, MENU_GUID};
+use crate::far::settings::PluginSettings;
 use crate::far::panels::{PluginPanel, FileType};
 use crate::base::reader::FileReader;
 use crate::v8_artifacts::vfs_builder::build_vfs;
@@ -17,19 +18,6 @@ use std::fs::File;
 use std::collections::HashMap;
 use log::info;
 
-const PLUGIN_GUID: GUID = GUID {
-    Data1: 0x1c1c1c1c,
-    Data2: 0x1c1c,
-    Data3: 0x1c1c,
-    Data4: [0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c],
-};
-
-const MENU_GUID: GUID = GUID {
-    Data1: 0x1c1c1c1d,
-    Data2: 0x1c1c,
-    Data3: 0x1c1c,
-    Data4: [0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1d],
-};
 
 #[no_mangle]
 pub unsafe extern "system" fn GetGlobalInfoW(info: *mut GlobalInfo) {
@@ -90,7 +78,8 @@ pub unsafe extern "system" fn GetPluginInfoW(info: *mut PluginInfo) {
 
         info.CommandPrefix = Box::leak(to_wide(env!("PLUGIN_PREFIX")).into_boxed_slice()).as_ptr();
 
-        let menu_string = Box::leak(to_wide("1C:Enterprise Artifacts").into_boxed_slice()).as_ptr();
+        let menu_title = crate::far::lang::get_msg(crate::far::lang::Msg::PluginTitle);
+        let menu_string = Box::leak(to_wide(&menu_title).into_boxed_slice()).as_ptr();
         let strings_arr = Box::leak(Box::new([menu_string]));
         let guids_arr = Box::leak(Box::new([MENU_GUID]));
 
@@ -101,7 +90,11 @@ pub unsafe extern "system" fn GetPluginInfoW(info: *mut PluginInfo) {
         };
         
         info.DiskMenu = PluginMenuItem { Guids: ptr::null(), Strings: ptr::null(), Count: 0 };
-        info.PluginConfig = PluginMenuItem { Guids: ptr::null(), Strings: ptr::null(), Count: 0 };
+        info.PluginConfig = PluginMenuItem {
+            Guids: guids_arr.as_ptr(),
+            Strings: strings_arr.as_ptr(),
+            Count: 1,
+        };
     });
 }
 
@@ -168,6 +161,10 @@ pub unsafe extern "system" fn OpenW(info: *const OpenInfo) -> HANDLE {
                 let path_wide_ptr = analyse_info.Handle as *mut Vec<u16>;
                 let path_wide = &*path_wide_ptr;
                 path = String::from_utf16_lossy(path_wide.as_slice().strip_suffix(&[0]).unwrap_or(path_wide));
+            }
+        } else if info.OpenFrom == 1 { // OPEN_PLUGINSMENU
+            if let Some(current_path) = get_current_path() {
+                path = current_path;
             }
         }
         
@@ -488,4 +485,84 @@ pub unsafe extern "system" fn ProcessPanelEventW(info: *const ProcessPanelEventI
         }
         0
     }).unwrap_or(0)
+}
+
+unsafe fn get_current_path() -> Option<String> {
+    let psi = STARTUP_INFO?;
+    let pc = psi.PanelControl?;
+
+    // 1. Get current directory
+    let dir_size = pc(PANEL_ACTIVE, FCTL_GETPANELDIRECTORY, 0, ptr::null_mut());
+    if dir_size == 0 {
+        return None;
+    }
+
+    let mut dir_buf = vec![0u8; dir_size as usize];
+    let fpd = dir_buf.as_mut_ptr() as *mut FarPanelDirectory;
+    (*fpd).StructSize = std::mem::size_of::<FarPanelDirectory>();
+    pc(PANEL_ACTIVE, FCTL_GETPANELDIRECTORY, dir_size, fpd as *mut std::ffi::c_void);
+
+    let dir_wide = (*fpd).Name;
+    if dir_wide.is_null() {
+        return None;
+    }
+    let mut len = 0;
+    while *dir_wide.offset(len) != 0 {
+        len += 1;
+    }
+    let dir_str = String::from_utf16_lossy(std::slice::from_raw_parts(dir_wide, len as usize));
+
+    // 2. Get current item
+    let item_size = pc(PANEL_ACTIVE, FCTL_GETCURRENTPANELITEM, 0, ptr::null_mut());
+    if item_size == 0 {
+        return None;
+    }
+
+    let mut item_data = vec![0u8; item_size as usize];
+    let mut fgpi = FarGetPluginPanelItem {
+        StructSize: std::mem::size_of::<FarGetPluginPanelItem>(),
+        Size: item_size as usize,
+        Item: item_data.as_mut_ptr() as *mut PluginPanelItem,
+    };
+
+    pc(
+        PANEL_ACTIVE,
+        FCTL_GETCURRENTPANELITEM,
+        item_size,
+        &mut fgpi as *mut _ as *mut std::ffi::c_void,
+    );
+
+    let item = &*fgpi.Item;
+    let name_wide = item.FileName;
+    if name_wide.is_null() {
+        return None;
+    }
+    let mut nlen = 0;
+    while *name_wide.offset(nlen) != 0 {
+        nlen += 1;
+    }
+    let name_str = String::from_utf16_lossy(std::slice::from_raw_parts(name_wide, nlen as usize));
+
+    if name_str == ".." {
+        return None;
+    }
+
+    let mut path = std::path::PathBuf::from(dir_str);
+    path.push(name_str);
+
+    Some(path.to_string_lossy().to_string())
+}
+#[no_mangle]
+pub unsafe extern "system" fn ConfigureW(info: *const ConfigureInfo) -> IntPtr {
+    if info.is_null() {
+        return 0;
+    }
+    
+    let current_settings = PluginSettings::load();
+    if let Some(new_settings) = crate::far::ui::show_settings_dialog(&current_settings) {
+        new_settings.save();
+        return 1;
+    }
+    
+    0
 }

@@ -15,9 +15,13 @@ impl ContainerWriter {
         Self { page_size, is_64bit, revision: 0, use_triplets: false, pad_pt_to_page: false }
     }
 
-    pub fn write<W: Write>(&self, writer: &mut W, rows: &HashMap<String, (Vec<u8>, bool)>) -> io::Result<()> {
+    pub fn write<W: Write, F: FnMut(usize, usize)>(&self, writer: &mut W, rows: &HashMap<String, (Vec<u8>, bool)>, mut progress: Option<F>) -> io::Result<()> {
         let mut docs = Vec::new();
-        for (id, (data, is_packed)) in rows {
+        let total_rows = rows.len();
+        for (i, (id, (data, is_packed))) in rows.iter().enumerate() {
+            if let Some(ref mut cb) = progress {
+                cb(i, total_rows);
+            }
             let wide_id = crate::far::api::to_wide(id);
             let id_bytes: Vec<u8> = wide_id.iter()
                 .flat_map(|&u| u.to_le_bytes().to_vec())
