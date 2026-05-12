@@ -55,7 +55,7 @@ impl ContainerWriter {
         let img_header_size = if self.is_64bit { 20u32 } else { 16u32 };
         let page_header_size = if self.is_64bit { 55u32 } else { 31u32 };
         let pointer_size = if self.is_64bit { 8 } else { 4 };
-        let end_marker = if self.is_64bit { u64::MAX } else { crate::v8_artifacts::container::SIG as u64 };
+        let end_marker = if self.is_64bit { u64::MAX } else { crate::v8::container::SIG as u64 };
 
         let pt_ptrs_per_row = if self.use_triplets { 3 } else { 2 };
         let mut pt_data_size = (docs.len() * pt_ptrs_per_row) as u32 * pointer_size;
@@ -103,12 +103,12 @@ impl ContainerWriter {
         let pt_pages = self.serialize_document_into_pages(&pointers_raw, &mut pt_offset, end_marker, pt_force_size);
 
         if self.is_64bit {
-            writer.write_all(&crate::v8_artifacts::container::SIG64.to_le_bytes())?;
+            writer.write_all(&crate::v8::container::SIG64.to_le_bytes())?;
             writer.write_all(&self.page_size.to_le_bytes())?;
             writer.write_all(&self.revision.to_le_bytes())?;
             writer.write_all(&0u32.to_le_bytes())?;
         } else {
-            writer.write_all(&crate::v8_artifacts::container::SIG.to_le_bytes())?;
+            writer.write_all(&crate::v8::container::SIG.to_le_bytes())?;
             writer.write_all(&self.page_size.to_le_bytes())?;
             writer.write_all(&self.revision.to_le_bytes())?;
             writer.write_all(&0u32.to_le_bytes())?;

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use crate::v8_artifacts::container::Container;
-use crate::v8_artifacts::uuids;
+use crate::v8::container::Container;
+use crate::v8::uuids;
 use crate::base::reader::StringReader;
 use crate::base::parser::{StructParser, strip_quotes};
 
@@ -106,7 +106,7 @@ fn extract_module_text(data: &[u8]) -> Option<(Vec<u8>, Option<Vec<u8>>)> {
     if data.len() >= 4 {
         if let Ok(bytes) = data[0..4].try_into() {
             let sig = u32::from_le_bytes(bytes);
-            if sig == crate::v8_artifacts::container::SIG || (sig as u64) == crate::v8_artifacts::container::SIG64 {
+            if sig == crate::v8::container::SIG || (sig as u64) == crate::v8::container::SIG64 {
                 let reader = StringReader::new(data.to_vec());
                 if let Ok(mut container) = Container::new(reader, 0) {
                     for row_res in container.rows() {

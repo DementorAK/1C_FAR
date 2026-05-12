@@ -1,6 +1,6 @@
 pub mod base;
 pub mod far;
-pub mod v8_artifacts;
+pub mod v8;
 
 mod version {
     include!(concat!(env!("OUT_DIR"), "/version.rs"));
@@ -11,7 +11,7 @@ use crate::far::{STARTUP_INFO, PLUGIN_GUID, MENU_GUID};
 use crate::far::settings::PluginSettings;
 use crate::far::panels::{PluginPanel, FileType};
 use crate::base::reader::FileReader;
-use crate::v8_artifacts::vfs_builder::build_vfs;
+use crate::v8::vfs_builder::build_vfs;
 use std::ptr;
 use std::panic;
 use std::fs::File;
@@ -187,12 +187,12 @@ pub unsafe extern "system" fn OpenW(info: *const OpenInfo) -> HANDLE {
                 match FileReader::new(file) {
                     Ok(mut reader) => {
                         // Read header to preserve page_size and bitness
-                        if let Ok(header) = crate::v8_artifacts::container::read_image_header(&mut reader, 0) {
+                        if let Ok(header) = crate::v8::container::read_image_header(&mut reader, 0) {
                             panel.page_size = header.page_size;
                             panel.is_64bit = header.header_size == 20;
                         }
 
-                        match crate::v8_artifacts::container::read_container_rows(reader, 0) {
+                        match crate::v8::container::read_container_rows(reader, 0) {
                             Ok(rows) => {
                                 let mut rows_map = HashMap::new();
                                 let mut packed_map = HashMap::new();

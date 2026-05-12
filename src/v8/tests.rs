@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::Path;
 use crate::base::reader::FileReader;
-use crate::v8_artifacts::vfs_builder::{build_vfs, VfsEntry};
+use crate::v8::vfs_builder::{build_vfs, VfsEntry};
 
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
@@ -18,7 +18,7 @@ mod integration {
         if !path.exists() { println!("Skipping {}", path_str); return; }
         let file = File::open(path).expect("open");
         let reader = FileReader::new(file).expect("reader");
-        let rows = crate::v8_artifacts::container::read_container_rows(reader, 0).expect("read_container_rows");
+        let rows = crate::v8::container::read_container_rows(reader, 0).expect("read_container_rows");
 
         println!("\n=== Files in {} ===", path_str);
         let mut count = 0;
@@ -46,7 +46,7 @@ mod integration {
         if !path.exists() { panic!("Not found: {}", path_str); }
         let file = File::open(path).expect("open");
         let reader = FileReader::new(file).expect("reader");
-        let rows = crate::v8_artifacts::container::read_container_rows(reader, 0).expect("read_container_rows");
+        let rows = crate::v8::container::read_container_rows(reader, 0).expect("read_container_rows");
         
         // Convert to HashMap<String, Vec<u8>> for build_vfs
         let mut rows_map = std::collections::HashMap::new();
@@ -184,7 +184,7 @@ mod integration {
         let data_original = std::fs::read(path_original).expect("Failed to read Original EPF");
         
         // 1. Read original rows
-        let rows_original = crate::v8_artifacts::container::read_container_rows(
+        let rows_original = crate::v8::container::read_container_rows(
             crate::base::reader::FileReader::new(std::fs::File::open(path_original).unwrap()).unwrap(),
             0
         ).expect("Failed to read rows from Original EPF");
@@ -192,17 +192,17 @@ mod integration {
         
         // 2. Repack
         let mut buffer = Vec::new();
-        let mut writer = crate::v8_artifacts::writer::ContainerWriter::new(512, false);
+        let mut writer = crate::v8::writer::ContainerWriter::new(512, false);
         writer.use_triplets = true;
         writer.pad_pt_to_page = true;
         // Match revision 6 from original
         writer.revision = 6;
-        writer.write(&mut buffer, &rows_original).expect("Failed to write NEW");
+        writer.write(&mut buffer, &rows_original, None::<fn(usize, usize)>).expect("Failed to write NEW");
         
         std::fs::write(&path_new, &buffer).expect("Failed to write NEW to disk");
         
         // PHASE 1: Can our parser read the repack?
-        let rows_new = crate::v8_artifacts::container::read_container_rows(
+        let rows_new = crate::v8::container::read_container_rows(
             crate::base::reader::StringReader::new(buffer.clone()),
             0
         ).expect("PHASE 1 FAILED: Parser cannot read the repacked container");

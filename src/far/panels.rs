@@ -1,8 +1,8 @@
-use crate::v8_artifacts::vfs_builder::VfsEntry;
+use crate::v8::vfs_builder::VfsEntry;
 use crate::far::api::*;
 use std::collections::HashMap;
 use std::io;
-use crate::v8_artifacts::writer::ContainerWriter;
+use crate::v8::writer::ContainerWriter;
 use crate::far::settings::PluginSettings;
 use chrono::Local;
 
@@ -264,7 +264,7 @@ fn sync_nodes_to_map(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>
                     let mut final_data = data.clone();
                     if let Some(orig_cont) = original_container {
                         // Smart re-wrap: use original container as template
-                        if let Ok(mut nested_rows) = crate::v8_artifacts::container::read_container_rows(
+                        if let Ok(mut nested_rows) = crate::v8::container::read_container_rows(
                             crate::base::reader::StringReader::new(orig_cont.clone()), 0
                         ) {
                             // Update only the text row, preserve everything else (info, etc.)

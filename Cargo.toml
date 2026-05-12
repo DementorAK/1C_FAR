@@ -1,10 +1,17 @@
 [package]
 name = "far1c"
-version = "0.2.11"
-description = "FAR Manager plugin for 1C:Enterprise artifacts"
+version = "0.3.3"
+description = "FAR Manager plugin for 1C:Enterprise artifacts (.epf, .erf, .cf, .cfe, .1cd)"
 authors = ["Dmitry Kinash <dv.kinash@gmail.com>"]
 edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+repository = "https://github.com/DementorAK/far1c"
+readme = "README.md"
+keywords = ["far-manager", "1c-enterprise", "plugin", "virtual-filesystem"]
+categories = ["filesystem", "development-tools"]
 build = "build.rs"
+
 
 [lib]
 crate-type = ["cdylib"]
