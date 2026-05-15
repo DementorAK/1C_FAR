@@ -3,6 +3,7 @@ use crate::far::{STARTUP_INFO, PLUGIN_GUID};
 use crate::far::lang::{get_msg, Msg};
 use std::ptr;
 
+#[cfg(feature = "far3")]
 pub fn show_progress(title: &str, message: &str, current: usize, total: usize) {
     unsafe {
         if let Some(psi) = STARTUP_INFO {
@@ -46,6 +47,7 @@ pub fn show_progress(title: &str, message: &str, current: usize, total: usize) {
     }
 }
 
+#[cfg(feature = "far3")]
 pub fn finish_progress() {
     unsafe {
         if let Some(psi) = STARTUP_INFO {
@@ -60,6 +62,7 @@ use crate::far::settings::{PluginSettings, UnpackStyle};
 
 const INVALID_HANDLE_VALUE: HANDLE = -1isize as HANDLE;
 
+#[cfg(feature = "far3")]
 pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings> {
     unsafe {
         let psi = STARTUP_INFO?;
@@ -204,4 +207,20 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             None
         }
     }
+}
+
+#[cfg(feature = "far2")]
+pub fn show_progress(title: &str, message: &str, current: usize, total: usize) {
+    // TODO: implement FAR2 progress
+}
+
+#[cfg(feature = "far2")]
+pub fn finish_progress() {
+    // TODO: implement FAR2 progress finish
+}
+
+#[cfg(feature = "far2")]
+pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings> {
+    // TODO: implement FAR2 settings dialog
+    None
 }

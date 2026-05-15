@@ -1,6 +1,20 @@
 // Layer 1: Interaction with Far Manager API
 
-pub mod api;
+pub mod traits;         // FarHost trait: abstraction over API version differences
+pub mod string_utils;   // Cross-platform wide string utilities (u16/u32)
+
+// API-version-specific submodules (selected at compile time via Cargo features)
+#[cfg(feature = "far3")]
+pub mod far3;           // FAR Manager 3 — bindings + exports
+
+#[cfg(feature = "far2")]
+pub mod far2;           // far2l / far2m — bindings + exports (Phase 4B)
+
+#[cfg(feature = "far3")]
+pub use crate::far::far3::api;
+#[cfg(feature = "far2")]
+pub use crate::far::far2::api;
+
 pub mod panels;
 pub mod settings;
 pub mod ui;

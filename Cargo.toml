@@ -1,6 +1,6 @@
 [package]
 name = "far1c"
-version = "0.3.3"
+version = "0.4.10"
 description = "FAR Manager plugin for 1C:Enterprise artifacts (.epf, .erf, .cf, .cfe, .1cd)"
 authors = ["Dmitry Kinash <dv.kinash@gmail.com>"]
 edition = "2021"
@@ -12,6 +12,13 @@ keywords = ["far-manager", "1c-enterprise", "plugin", "virtual-filesystem"]
 categories = ["filesystem", "development-tools"]
 build = "build.rs"
 
+# --- Plugin API version selection ---
+# Use `--features far2 --no-default-features` to build for far2l/far2m (Linux).
+# Default: far3 (FAR Manager 3, Windows).
+[features]
+default = ["far3"]
+far3 = []   # FAR Manager 3 Plugin API (Windows, wchar_t=u16)
+far2 = []   # far2l / far2m Plugin API  (Linux/macOS, wchar_t=u32)
 
 [lib]
 crate-type = ["cdylib"]
@@ -22,6 +29,11 @@ encoding_rs = "0.8"
 uuid = { version = "1.3", features = ["v4"] }
 widestring = "1.0"
 log = "0.4"
-windebug_logger = "0.1"
-simple_logger = "4.0"
 chrono = "0.4.44"
+
+# Platform-conditional loggers
+[target.'cfg(windows)'.dependencies]
+windebug_logger = "0.1"
+
+[target.'cfg(not(windows))'.dependencies]
+simple_logger = "4.0"

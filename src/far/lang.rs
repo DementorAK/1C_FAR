@@ -18,17 +18,29 @@ pub enum Msg {
     PackingMessage = 11,
 }
 
+#[cfg(feature = "far3")]
 pub fn get_msg(id: Msg) -> String {
     unsafe {
         if let Some(psi) = STARTUP_INFO {
             if let Some(gm) = psi.GetMsg {
                 let ptr = gm(&PLUGIN_GUID, id as IntPtr);
                 if !ptr.is_null() {
-                    let mut len = 0;
-                    while *ptr.offset(len) != 0 {
-                        len += 1;
-                    }
-                    return String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len as usize));
+                    return crate::far::string_utils::from_wide_ptr(ptr);
+                }
+            }
+        }
+        format!("MsgId:{}", id as isize)
+    }
+}
+
+#[cfg(feature = "far2")]
+pub fn get_msg(id: Msg) -> String {
+    unsafe {
+        if let Some(psi) = STARTUP_INFO {
+            if let Some(gm) = psi.GetMsg {
+                let ptr = gm(psi.ModuleNumber, id as IntPtr);
+                if !ptr.is_null() {
+                    return crate::far::string_utils::from_wide_ptr(ptr);
                 }
             }
         }

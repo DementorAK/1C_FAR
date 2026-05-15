@@ -22,7 +22,7 @@ impl ContainerWriter {
             if let Some(ref mut cb) = progress {
                 cb(i, total_rows);
             }
-            let wide_id = crate::far::api::to_wide(id);
+            let wide_id: Vec<u16> = id.encode_utf16().chain(std::iter::once(0)).collect();
             let id_bytes: Vec<u8> = wide_id.iter()
                 .flat_map(|&u| u.to_le_bytes().to_vec())
                 .collect();

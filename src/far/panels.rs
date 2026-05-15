@@ -1,5 +1,5 @@
 use crate::v8::vfs_builder::VfsEntry;
-use crate::far::api::*;
+
 use std::collections::HashMap;
 use std::io;
 use crate::v8::writer::ContainerWriter;
@@ -291,31 +291,3 @@ fn sync_nodes_to_map(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>
     }
 }
 
-/// Convert VFS entries to FAR PluginPanelItems.
-/// The strings are boxed and leaked to be owned by FAR until FreeFindDataW.
-pub fn vfs_to_panel_items(entries: &[VfsEntry]) -> (Vec<PluginPanelItem>, Vec<*const u16>) {
-    let mut items = Vec::new();
-    let mut leaked_ptrs = Vec::new(); // track leaked strings for potential cleanup (not needed, FAR frees via our items)
-
-    for entry in entries {
-        let mut item = PluginPanelItem::default();
-
-        // Leak the filename string (FAR will own it until FreeFindDataW)
-        let wide = crate::far::api::to_wide(entry.name());
-        let ptr = Box::leak(wide.into_boxed_slice()).as_ptr();
-        item.FileName = ptr;
-        leaked_ptrs.push(ptr);
-
-        if entry.is_dir() {
-            item.FileAttributes = 0x10; // FILE_ATTRIBUTE_DIRECTORY
-            item.FileSize = 0;
-        } else {
-            item.FileAttributes = 0x20; // FILE_ATTRIBUTE_ARCHIVE
-            item.FileSize = entry.file_data().map(|d| d.len() as u64).unwrap_or(0);
-        }
-
-        items.push(item);
-    }
-
-    (items, leaked_ptrs)
-}
