@@ -28,6 +28,7 @@ A cross-platform plugin for **FAR Manager** / **far2l** that provides transparen
 ```bash
 cargo build --release
 ```
+*(Note: Windows/FAR 3 is the default build target)*
 
 ### Windows (FAR Manager 3)
 
@@ -40,7 +41,10 @@ cargo build --release
 
 ### Linux (far2l)
 
-1. Build the plugin (see above)
+1. Build the plugin for Linux:
+   ```bash
+   cargo build --release --no-default-features --features far2
+   ```
 2. Create plugin directory: `~/.config/far2l/Plugins/far1c/`
 3. Copy `target/release/libfar1c.so` to the plugin directory
 4. Copy language files `far1c_en.lng` and `far1c_ru.lng` to the same directory
@@ -83,9 +87,16 @@ The project follows a three-layer architecture:
 
 ```
 src/
-├── lib.rs                       # Entry point, Far Plugin API export (C ABI)
-├── far/                         # LAYER 1: FAR Manager interaction
-│   ├── api.rs                   # Full Far Plugin SDK 3.0 bindings (C ABI)
+├── lib.rs                       # Entry point, conditional Far API export
+├── far/                         # LAYER 1: FAR Manager interaction (Dual-API)
+│   ├── far3/                    # Implementation for FAR 3 (Windows)
+│   │   ├── api.rs               # Far Plugin SDK 3.0 bindings
+│   │   └── exports.rs           # Exported C ABI functions
+│   ├── far2/                    # Implementation for far2l/far2m (Linux/macOS)
+│   │   ├── api.rs               # far2l Plugin API bindings
+│   │   └── exports.rs           # Exported C ABI functions
+│   ├── string_utils.rs          # Cross-platform string handling (u16/u32)
+│   ├── traits.rs                # FarHost trait for API abstraction
 │   ├── panels.rs                # Virtual file panel logic (VFS, navigation, commit)
 │   ├── ui.rs                    # UI elements (dialogs, progress bars, menus)
 │   ├── lang.rs                  # Localization via .lng files
@@ -109,12 +120,15 @@ src/
 | Phase 0 | Infrastructure setup | ✅ Complete |
 | Phase 1 | Plugin skeleton + CF parser | ✅ Complete |
 | Phase 2 | EPF/ERF: VFS tree, F3/F4, CF-writer, settings, localization | ✅ Complete |
-| Phase 3 | Documentation & GitHub publication | 🔄 In progress |
-| Phase 4 | Cross-platform testing & persistent settings | 🔜 Planned |
-| Phase 5 | CF/CFE: metadata hierarchy, cascading rebuild | 🔜 Planned |
-| Phase 6 | Protected modules: bytecode disassembler | 🔜 Planned |
-| Phase 7 | 1CD: file database navigation | 🔜 Planned |
-| Phase 8 | Polish: lazy loading, large files | 🔜 Planned |
+| Phase 3 | Documentation & GitHub primary publication | ✅ Complete |
+| Phase 4A| Dual-API refactoring (FAR 3) | ✅ Complete |
+| Phase 4B| far2l basic integration | ✅ Complete |
+| Phase 5 | Documentation update V2 & CI | 🔄 In progress |
+| Phase 6 | Linux version (build, stubs, testing) | 🔜 Planned |
+| Phase 7 | CF/CFE: metadata hierarchy, cascading rebuild | 🔜 Planned |
+| Phase 8 | Protected modules: bytecode disassembler | 🔜 Planned |
+| Phase 9 | 1CD: file database navigation | 🔜 Planned |
+| Phase 10| Polish: lazy loading, large files | 🔜 Planned |
 
 ## Documentation
 

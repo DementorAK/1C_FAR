@@ -11,11 +11,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
-- Phase 4: Cross-platform testing on Linux (far2l) and persistent settings
-- Phase 5: `.cf` / `.cfe` — full metadata hierarchy navigation and cascading rebuild
-- Phase 6: Protected modules — bytecode disassembler
-- Phase 7: `.1cd` — file database navigation and configuration replacement
-- Phase 8: Lazy loading for large files (> 100 MB)
+- Phase 5: Documentation update (Architecture V2) and GitHub Actions (CI)
+- Phase 6: Linux Version — far2l complete implementation, cross-compilation and testing
+- Phase 7: `.cf` / `.cfe` — full metadata hierarchy navigation and cascading rebuild
+- Phase 8: Protected modules — bytecode disassembler
+- Phase 9: `.1cd` — file database navigation and configuration replacement
+- Phase 10: Lazy loading for large files (> 100 MB) and compatibility polish
+
+---
+
+## [0.5.2] — 2026-05-15
+
+### Changed
+
+- Updated project documentation (`README.md`, `README.ru.md`, `CONTRIBUTING.md`) to reflect the new Dual-API architecture (Architecture V2).
+
+---
+
+## [0.4.10] — 2026-05-15
+
+### Added
+
+- `far3` and `far2` Cargo features for conditional compilation of Windows and Linux implementations.
+- FAR 2 Plugin API bindings (`src/far/far2/api.rs`) and exported function stubs (`src/far/far2/exports.rs`) for far2l/far2m compatibility.
+- Cross-platform string utilities (`src/far/string_utils.rs`) supporting both `u16` (Windows) and `u32` (Linux) wide characters.
+
+### Changed
+
+- Migrated to Dual-API architecture (Architecture V2) establishing a solid foundation for cross-platform compatibility.
+- Reorganized `src/far` module structure: Windows-specific FAR 3 logic moved to `src/far/far3/`.
+- Decoupled business logic (`panels.rs`, `ui.rs`, `lang.rs`) and `v8/writer.rs` from version-specific APIs using conditional compilation and export layers.
+- Project plan (`docs/project/plan.md`) refactored: split Phase 4 into Dual-API refactoring and Linux implementation, shifted subsequent phases to accommodate new architecture V2 goals.
 
 ---
 

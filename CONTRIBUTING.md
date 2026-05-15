@@ -13,11 +13,14 @@ Thank you for your interest in contributing to **far1c**! This document provides
 ### Building
 
 ```bash
-# Debug build
+# Debug build (Windows / FAR 3 default)
 cargo build
 
-# Release build
+# Release build (Windows / FAR 3 default)
 cargo build --release
+
+# Release build (Linux / far2l)
+cargo build --release --no-default-features --features far2
 
 # Run tests
 cargo test
@@ -46,7 +49,7 @@ The codebase is organized into three layers:
 
 | Layer | Directory | Responsibility |
 |-------|-----------|----------------|
-| **Layer 1** | `src/far/` | FAR Manager API interaction (panels, UI, settings) |
+| **Layer 1** | `src/far/` | FAR API interaction. Uses Dual-API Architecture (`far3` for Windows, `far2` for Linux) with `traits.rs` abstraction. |
 | **Layer 2** | `src/v8/` | 1C artifact parsing, VFS tree construction, container repacking |
 | **Layer 3** | `src/base/` | Low-level I/O, bracket-format parser, DEFLATE compression |
 
