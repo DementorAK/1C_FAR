@@ -1,6 +1,6 @@
-use std::io::{self};
-use crate::base::reader::V8Reader;
 use crate::base::deflate::inflate;
+use crate::base::reader::V8Reader;
+use std::io::{self};
 
 pub const SIG: u32 = 0x7FFFFFFF;
 pub const SIG64: u64 = 0xFFFFFFFFFFFFFFFF;
@@ -19,9 +19,9 @@ pub fn read_image_header<R: V8Reader>(reader: &mut R, offset: u64) -> io::Result
     reader.set_pos(offset)?;
     let mut buf = [0u8; 8];
     reader.read_exact(&mut buf)?;
-    
-    let is_64bit = &buf[0..4] != &SIG.to_le_bytes();
-    
+
+    let is_64bit = buf[0..4] != SIG.to_le_bytes();
+
     reader.set_pos(offset)?;
     if is_64bit {
         let mut full_buf = [0u8; 20];
@@ -58,14 +58,20 @@ pub fn read_page_header<R: V8Reader>(reader: &mut R, is_64bit: bool) -> io::Resu
     if is_64bit {
         let mut buf = [0u8; 55];
         reader.read_exact(&mut buf)?;
-        
-        let full_size_str = std::str::from_utf8(&buf[2..18]).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let page_size_str = std::str::from_utf8(&buf[19..35]).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let next_page_str = std::str::from_utf8(&buf[36..52]).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        let full_size = u64::from_str_radix(full_size_str, 16).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let page_size = u64::from_str_radix(page_size_str, 16).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let next_page = u64::from_str_radix(next_page_str, 16).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let full_size_str = std::str::from_utf8(&buf[2..18])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let page_size_str = std::str::from_utf8(&buf[19..35])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let next_page_str = std::str::from_utf8(&buf[36..52])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+        let full_size = u64::from_str_radix(full_size_str, 16)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let page_size = u64::from_str_radix(page_size_str, 16)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let next_page = u64::from_str_radix(next_page_str, 16)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(PageHeader {
             full_size,
@@ -77,13 +83,22 @@ pub fn read_page_header<R: V8Reader>(reader: &mut R, is_64bit: bool) -> io::Resu
         let mut buf = [0u8; 31];
         reader.read_exact(&mut buf)?;
 
-        let full_size_str = std::str::from_utf8(&buf[2..10]).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let page_size_str = std::str::from_utf8(&buf[11..19]).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let next_page_str = std::str::from_utf8(&buf[20..28]).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let full_size_str = std::str::from_utf8(&buf[2..10])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let page_size_str = std::str::from_utf8(&buf[11..19])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let next_page_str = std::str::from_utf8(&buf[20..28])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        let full_size = u32::from_str_radix(full_size_str, 16).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))? as u64;
-        let page_size = u32::from_str_radix(page_size_str, 16).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))? as u64;
-        let next_page = u32::from_str_radix(next_page_str, 16).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))? as u64;
+        let full_size = u32::from_str_radix(full_size_str, 16)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+            as u64;
+        let page_size = u32::from_str_radix(page_size_str, 16)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+            as u64;
+        let next_page = u32::from_str_radix(next_page_str, 16)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?
+            as u64;
 
         Ok(PageHeader {
             full_size,
@@ -108,7 +123,7 @@ impl<R: V8Reader> Container<R> {
         let is_64bit = header.header_size == 20;
         let end_marker = if is_64bit { SIG64 } else { SIG as u64 };
         let pointer_size = if is_64bit { 8 } else { 4 };
-        
+
         let mut pointers = Vec::new();
         let mut current_page_pos = offset + header.header_size;
         let mut first_page = true;
@@ -117,11 +132,11 @@ impl<R: V8Reader> Container<R> {
         while current_page_pos != end_marker {
             reader.set_pos(current_page_pos)?;
             let page_header = read_page_header(&mut reader, is_64bit)?;
-            
+
             if first_page {
                 remaining_size = page_header.full_size;
                 first_page = false;
-                
+
                 // Estimate the full document size (including headers)
                 // This is needed to advance `offset` for multi-container files.
                 // In v8unpack, the document size is calculated robustly. For the pointer table,
@@ -131,7 +146,7 @@ impl<R: V8Reader> Container<R> {
 
             let mut buf = vec![0u8; page_header.page_size as usize];
             reader.read_exact(&mut buf)?;
-            
+
             let to_process = std::cmp::min(page_header.page_size, remaining_size) as usize;
             for chunk in buf[..to_process].chunks_exact(pointer_size) {
                 let p = if is_64bit {
@@ -143,10 +158,10 @@ impl<R: V8Reader> Container<R> {
                     pointers.push(p);
                 }
             }
-            
+
             remaining_size -= to_process as u64;
             current_page_pos = page_header.next_page;
-            
+
             if current_page_pos == end_marker || remaining_size == 0 {
                 break;
             }
@@ -172,7 +187,7 @@ impl<R: V8Reader> Container<R> {
         let abs_addr = self.offset + addr;
         self.reader.set_pos(abs_addr)?;
         let page_header = read_page_header(&mut self.reader, self.is_64bit)?;
-        
+
         let mut result = Vec::with_capacity(page_header.full_size as usize);
         let mut remaining = page_header.full_size;
         let mut next_page = addr;
@@ -182,12 +197,12 @@ impl<R: V8Reader> Container<R> {
             let abs_next = self.offset + next_page;
             self.reader.set_pos(abs_next)?;
             let ph = read_page_header(&mut self.reader, self.is_64bit)?;
-            
+
             let to_read = std::cmp::min(remaining, ph.page_size);
             let mut buf = vec![0u8; to_read as usize];
             self.reader.read_exact(&mut buf)?;
             result.extend_from_slice(&buf);
-            
+
             remaining -= to_read;
             next_page = ph.next_page;
         }
@@ -225,10 +240,14 @@ impl<'a, R: V8Reader> Iterator for RowIterator<'a, R> {
         };
 
         if header_data.len() < 20 {
-            return Some(Err(io::Error::new(io::ErrorKind::InvalidData, "Row header too short")));
+            return Some(Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Row header too short",
+            )));
         }
         let id_raw = &header_data[20..];
-        let id_u16: Vec<u16> = id_raw.chunks_exact(2)
+        let id_u16: Vec<u16> = id_raw
+            .chunks_exact(2)
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .take_while(|&u| u != 0)
             .collect();
@@ -258,7 +277,10 @@ impl<'a, R: V8Reader> Iterator for RowIterator<'a, R> {
     }
 }
 
-pub fn read_container_rows<R: V8Reader>(reader: R, offset: u64) -> io::Result<std::collections::HashMap<String, (Vec<u8>, bool)>> {
+pub fn read_container_rows<R: V8Reader>(
+    reader: R,
+    offset: u64,
+) -> io::Result<std::collections::HashMap<String, (Vec<u8>, bool)>> {
     let mut container = Container::new(reader, offset)?;
     let mut rows = std::collections::HashMap::new();
     for row_res in container.rows() {
@@ -267,4 +289,3 @@ pub fn read_container_rows<R: V8Reader>(reader: R, offset: u64) -> io::Result<st
     }
     Ok(rows)
 }
-

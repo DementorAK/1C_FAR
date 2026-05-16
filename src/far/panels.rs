@@ -1,10 +1,10 @@
 use crate::v8::vfs_builder::VfsEntry;
 
+use crate::far::settings::PluginSettings;
+use crate::v8::writer::ContainerWriter;
+use chrono::Local;
 use std::collections::HashMap;
 use std::io;
-use crate::v8::writer::ContainerWriter;
-use crate::far::settings::PluginSettings;
-use chrono::Local;
 
 /// Supported artifact types.
 #[derive(Debug, Clone, Copy)]
@@ -180,7 +180,9 @@ impl PluginPanel {
 
     /// Find a mutable entry in the current virtual directory by name.
     pub fn find_entry_in_current_dir_mut(&mut self, name: &str) -> Option<&mut VfsEntry> {
-        self.resolve_current_dir_mut().iter_mut().find(|e| e.name() == name)
+        self.resolve_current_dir_mut()
+            .iter_mut()
+            .find(|e| e.name() == name)
     }
 
     /// Commit memory changes to disk artifact.
@@ -192,16 +194,22 @@ impl PluginPanel {
         // 1. Create backup if enabled
         if self.settings.create_backup {
             let path = std::path::Path::new(&self.path);
-            let stem = path.file_stem().map(|s| s.to_string_lossy()).unwrap_or_default();
-            let extension = path.extension().map(|e| e.to_string_lossy()).unwrap_or_default();
+            let stem = path
+                .file_stem()
+                .map(|s| s.to_string_lossy())
+                .unwrap_or_default();
+            let extension = path
+                .extension()
+                .map(|e| e.to_string_lossy())
+                .unwrap_or_default();
             let timestamp = Local::now().format("%Y%m%d-%H%M%S").to_string();
-            
+
             let bak_name = if extension.is_empty() {
                 format!("{}.{}", stem, timestamp)
             } else {
                 format!("{}.{}.{}", stem, timestamp, extension)
             };
-            
+
             let bak_path = path.with_file_name(bak_name);
             std::fs::copy(&self.path, &bak_path)?;
         }
@@ -216,33 +224,37 @@ impl PluginPanel {
         writer_logic.pad_pt_to_page = true;
         writer_logic.revision = 6;
         let mut buffer = Vec::new();
-        
+
         // Combine rows and packed state
         let mut full_rows = HashMap::new();
         for (id, data) in &self.rows_map {
             let is_packed = self.packed_map.get(id).cloned().unwrap_or(true);
             full_rows.insert(id.clone(), (data.clone(), is_packed));
         }
-        
+
         let host_name = self.host_filename.clone();
-        writer_logic.write(&mut buffer, &full_rows, Some(|current, total| {
-            crate::far::ui::show_progress(
-                &crate::far::lang::get_msg(crate::far::lang::Msg::SavingTitle),
-                &host_name,
-                current,
-                total
-            );
-        }))?;
+        writer_logic.write(
+            &mut buffer,
+            &full_rows,
+            Some(|current, total| {
+                crate::far::ui::show_progress(
+                    &crate::far::lang::get_msg(crate::far::lang::Msg::SavingTitle),
+                    &host_name,
+                    current,
+                    total,
+                );
+            }),
+        )?;
         crate::far::ui::finish_progress();
 
         // Write to temp file then rename (atomic swap)
         let tmp_path = format!("{}.tmp", self.path);
         std::fs::write(&tmp_path, buffer)?;
-        
+
         // On Windows, rename fails if destination exists, so we might need to remove it or use winapi.
         // But std::fs::rename usually handles it if it's the same volume.
         // If it fails, we try to remove first.
-        if let Err(_) = std::fs::rename(&tmp_path, &self.path) {
+        if std::fs::rename(&tmp_path, &self.path).is_err() {
             std::fs::remove_file(&self.path)?;
             std::fs::rename(&tmp_path, &self.path)?;
         }
@@ -259,24 +271,31 @@ impl PluginPanel {
 fn sync_nodes_to_map(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>>) {
     for entry in entries {
         match entry {
-            VfsEntry::File { data, origin_row_id, original_container, .. } => {
+            VfsEntry::File {
+                data,
+                origin_row_id,
+                original_container,
+                ..
+            } => {
                 if let Some(row_id) = origin_row_id {
                     let mut final_data = data.clone();
                     if let Some(orig_cont) = original_container {
                         // Smart re-wrap: use original container as template
                         if let Ok(mut nested_rows) = crate::v8::container::read_container_rows(
-                            crate::base::reader::StringReader::new(orig_cont.clone()), 0
+                            crate::base::reader::StringReader::new(orig_cont.clone()),
+                            0,
                         ) {
                             // Update only the text row, preserve everything else (info, etc.)
                             nested_rows.insert("text".to_string(), (data.clone(), false));
-                            
+
                             // Nested containers match the original 1C format (triplets, stored text)
                             let mut writer = ContainerWriter::new(512, false);
                             writer.use_triplets = true;
                             writer.pad_pt_to_page = false;
                             writer.revision = 6;
                             let mut buffer = Vec::new();
-                            if let Ok(_) = writer.write(&mut buffer, &nested_rows, None::<fn(usize, usize)>) {
+                            if writer.write(&mut buffer, &nested_rows, None::<fn(usize, usize)>).is_ok()
+                            {
                                 final_data = buffer;
                             }
                         }
@@ -290,4 +309,3 @@ fn sync_nodes_to_map(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>
         }
     }
 }
-

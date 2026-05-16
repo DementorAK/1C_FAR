@@ -6,7 +6,7 @@ fn main() {
     let current_version = std::env::var("CARGO_PKG_VERSION").unwrap();
     let mut build_num_path = PathBuf::from(manifest_dir);
     build_num_path.push("build_num.txt");
-    
+
     let mut build_num: u32 = 0;
     let mut last_version = String::new();
 
@@ -27,11 +27,15 @@ fn main() {
         build_num += 1;
     }
 
-    fs::write(&build_num_path, format!("{}:{}", current_version, build_num)).expect("Failed to write build_num.txt");
+    fs::write(
+        &build_num_path,
+        format!("{}:{}", current_version, build_num),
+    )
+    .expect("Failed to write build_num.txt");
 
     let mut version_rs_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     version_rs_path.push("version.rs");
-    
+
     let version_content = format!(
         "#[allow(dead_code)]\npub const VERSION: &str = \"{}\";\npub const BUILD_NUMBER: u32 = {};\n",
         current_version, build_num
@@ -41,7 +45,7 @@ fn main() {
 
     // Export the command prefix
     println!("cargo:rustc-env=PLUGIN_PREFIX=1c");
-    
+
     // Ensure we rerun if any source changes or version changes
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=Cargo.toml");

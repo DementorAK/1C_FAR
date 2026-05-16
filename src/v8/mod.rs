@@ -1,8 +1,8 @@
 // Layer 2: 1C:Enterprise artifact semantics and structure
 
 pub mod container;
-pub mod vfs_builder;
-pub mod writer;
-pub mod uuids;
 #[cfg(test)]
 mod tests;
+pub mod uuids;
+pub mod vfs_builder;
+pub mod writer;

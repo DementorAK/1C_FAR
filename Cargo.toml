@@ -1,6 +1,6 @@
 [package]
 name = "far1c"
-version = "0.5.2"
+version = "0.5.4"
 description = "FAR Manager plugin for 1C:Enterprise artifacts (.epf, .erf, .cf, .cfe, .1cd)"
 authors = ["Dmitry Kinash <dv.kinash@gmail.com>"]
 edition = "2021"

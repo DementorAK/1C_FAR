@@ -22,7 +22,6 @@ pub struct GUID {
     pub Data4: [u8; 8],
 }
 
-
 pub const TRUE: BOOL = 1;
 pub const FALSE: BOOL = 0;
 
@@ -88,17 +87,53 @@ pub struct PluginInfo {
 }
 
 pub type FARAPIMENU = *mut c_void;
-pub type FARAPIMESSAGE = Option<unsafe extern "system" fn(PluginNumber: IntPtr, Flags: DWORD, HelpTopic: *const WCHAR, Items: *const *const WCHAR, ItemsNumber: i32, ButtonsNumber: i32) -> IntPtr>;
-pub type FARAPIGETMSG = Option<unsafe extern "system" fn(PluginNumber: IntPtr, MsgId: IntPtr) -> *const WCHAR>;
-pub type FARAPICONTROL = Option<unsafe extern "system" fn(hPlugin: HANDLE, Command: i32, Param1: i32, Param2: IntPtr) -> i32>;
+pub type FARAPIMESSAGE = Option<
+    unsafe extern "system" fn(
+        PluginNumber: IntPtr,
+        Flags: DWORD,
+        HelpTopic: *const WCHAR,
+        Items: *const *const WCHAR,
+        ItemsNumber: i32,
+        ButtonsNumber: i32,
+    ) -> IntPtr,
+>;
+pub type FARAPIGETMSG =
+    Option<unsafe extern "system" fn(PluginNumber: IntPtr, MsgId: IntPtr) -> *const WCHAR>;
+pub type FARAPICONTROL = Option<
+    unsafe extern "system" fn(hPlugin: HANDLE, Command: i32, Param1: i32, Param2: IntPtr) -> i32,
+>;
 pub type FARAPISAVESCREEN = *mut c_void;
 pub type FARAPIRESTORESCREEN = *mut c_void;
 pub type FARAPIGETDIRLIST = *mut c_void;
 pub type FARAPIGETPLUGINDIRLIST = *mut c_void;
 pub type FARAPIFREEDIRLIST = *mut c_void;
 pub type FARAPIFREEPLUGINDIRLIST = *mut c_void;
-pub type FARAPIVIEWER = Option<unsafe extern "system" fn(FileName: *const WCHAR, Title: *const WCHAR, X1: i32, Y1: i32, X2: i32, Y2: i32, Flags: DWORD, CodePage: u32) -> i32>;
-pub type FARAPIEDITOR = Option<unsafe extern "system" fn(FileName: *const WCHAR, Title: *const WCHAR, X1: i32, Y1: i32, X2: i32, Y2: i32, Flags: DWORD, StartLine: i32, StartChar: i32, CodePage: u32) -> i32>;
+pub type FARAPIVIEWER = Option<
+    unsafe extern "system" fn(
+        FileName: *const WCHAR,
+        Title: *const WCHAR,
+        X1: i32,
+        Y1: i32,
+        X2: i32,
+        Y2: i32,
+        Flags: DWORD,
+        CodePage: u32,
+    ) -> i32,
+>;
+pub type FARAPIEDITOR = Option<
+    unsafe extern "system" fn(
+        FileName: *const WCHAR,
+        Title: *const WCHAR,
+        X1: i32,
+        Y1: i32,
+        X2: i32,
+        Y2: i32,
+        Flags: DWORD,
+        StartLine: i32,
+        StartChar: i32,
+        CodePage: u32,
+    ) -> i32,
+>;
 pub type FARAPICMPNAME = *mut c_void;
 pub type FARAPITEXT = *mut c_void;
 pub type FARAPIEDITORCONTROL = *mut c_void;
@@ -164,16 +199,16 @@ impl Default for PluginStartupInfo {
 }
 
 pub type OPERATION_MODES = u32;
-pub const OPM_SILENT: OPERATION_MODES     = 0x0001;
-pub const OPM_FIND: OPERATION_MODES       = 0x0002;
-pub const OPM_VIEW: OPERATION_MODES       = 0x0004;
-pub const OPM_EDIT: OPERATION_MODES       = 0x0008;
-pub const OPM_TOPLEVEL: OPERATION_MODES   = 0x0010;
-pub const OPM_DESCR: OPERATION_MODES      = 0x0020;
-pub const OPM_QUICKVIEW: OPERATION_MODES  = 0x0040;
-pub const OPM_PGDN: OPERATION_MODES       = 0x0080;
-pub const OPM_COMMANDS: OPERATION_MODES   = 0x0100;
-pub const OPM_NONE: OPERATION_MODES       = 0;
+pub const OPM_SILENT: OPERATION_MODES = 0x0001;
+pub const OPM_FIND: OPERATION_MODES = 0x0002;
+pub const OPM_VIEW: OPERATION_MODES = 0x0004;
+pub const OPM_EDIT: OPERATION_MODES = 0x0008;
+pub const OPM_TOPLEVEL: OPERATION_MODES = 0x0010;
+pub const OPM_DESCR: OPERATION_MODES = 0x0020;
+pub const OPM_QUICKVIEW: OPERATION_MODES = 0x0040;
+pub const OPM_PGDN: OPERATION_MODES = 0x0080;
+pub const OPM_COMMANDS: OPERATION_MODES = 0x0100;
+pub const OPM_NONE: OPERATION_MODES = 0;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -247,29 +282,29 @@ impl Default for OpenPluginInfo {
 }
 
 pub type OPENPLUGIN_OPENFROM = i32;
-pub const OPEN_DISKMENU: OPENPLUGIN_OPENFROM           = 0;
-pub const OPEN_PLUGINSMENU: OPENPLUGIN_OPENFROM        = 1;
-pub const OPEN_FINDLIST: OPENPLUGIN_OPENFROM           = 2;
-pub const OPEN_SHORTCUT: OPENPLUGIN_OPENFROM           = 3;
-pub const OPEN_COMMANDLINE: OPENPLUGIN_OPENFROM        = 4;
-pub const OPEN_EDITOR: OPENPLUGIN_OPENFROM             = 5;
-pub const OPEN_VIEWER: OPENPLUGIN_OPENFROM             = 6;
-pub const OPEN_FILEPANEL: OPENPLUGIN_OPENFROM          = 7;
-pub const OPEN_DIALOG: OPENPLUGIN_OPENFROM             = 8;
-pub const OPEN_ANALYSE: OPENPLUGIN_OPENFROM            = 9;
+pub const OPEN_DISKMENU: OPENPLUGIN_OPENFROM = 0;
+pub const OPEN_PLUGINSMENU: OPENPLUGIN_OPENFROM = 1;
+pub const OPEN_FINDLIST: OPENPLUGIN_OPENFROM = 2;
+pub const OPEN_SHORTCUT: OPENPLUGIN_OPENFROM = 3;
+pub const OPEN_COMMANDLINE: OPENPLUGIN_OPENFROM = 4;
+pub const OPEN_EDITOR: OPENPLUGIN_OPENFROM = 5;
+pub const OPEN_VIEWER: OPENPLUGIN_OPENFROM = 6;
+pub const OPEN_FILEPANEL: OPENPLUGIN_OPENFROM = 7;
+pub const OPEN_DIALOG: OPENPLUGIN_OPENFROM = 8;
+pub const OPEN_ANALYSE: OPENPLUGIN_OPENFROM = 9;
 
 pub type PANELINFOFLAGS = u32;
-pub const PFLAGS_SHOWHIDDEN: PANELINFOFLAGS         = 0x00000001;
-pub const PFLAGS_HIGHLIGHT: PANELINFOFLAGS          = 0x00000002;
-pub const PFLAGS_REVERSESORTORDER: PANELINFOFLAGS   = 0x00000004;
-pub const PFLAGS_USESORTGROUPS: PANELINFOFLAGS      = 0x00000008;
-pub const PFLAGS_SELECTEDFIRST: PANELINFOFLAGS      = 0x00000010;
-pub const PFLAGS_REALNAMES: PANELINFOFLAGS          = 0x00000020;
-pub const PFLAGS_NUMERICSORT: PANELINFOFLAGS        = 0x00000040;
-pub const PFLAGS_PANELLEFT: PANELINFOFLAGS          = 0x00000080;
-pub const PFLAGS_DIRECTORIESFIRST: PANELINFOFLAGS   = 0x00000100;
-pub const PFLAGS_USECRC32: PANELINFOFLAGS           = 0x00000200;
-pub const PFLAGS_CASESENSITIVESORT: PANELINFOFLAGS  = 0x00000400;
+pub const PFLAGS_SHOWHIDDEN: PANELINFOFLAGS = 0x00000001;
+pub const PFLAGS_HIGHLIGHT: PANELINFOFLAGS = 0x00000002;
+pub const PFLAGS_REVERSESORTORDER: PANELINFOFLAGS = 0x00000004;
+pub const PFLAGS_USESORTGROUPS: PANELINFOFLAGS = 0x00000008;
+pub const PFLAGS_SELECTEDFIRST: PANELINFOFLAGS = 0x00000010;
+pub const PFLAGS_REALNAMES: PANELINFOFLAGS = 0x00000020;
+pub const PFLAGS_NUMERICSORT: PANELINFOFLAGS = 0x00000040;
+pub const PFLAGS_PANELLEFT: PANELINFOFLAGS = 0x00000080;
+pub const PFLAGS_DIRECTORIESFIRST: PANELINFOFLAGS = 0x00000100;
+pub const PFLAGS_USECRC32: PANELINFOFLAGS = 0x00000200;
+pub const PFLAGS_CASESENSITIVESORT: PANELINFOFLAGS = 0x00000400;
 
 pub type PANELINFOTYPE = i32;
 pub const PTYPE_FILEPANEL: PANELINFOTYPE = 0;
@@ -306,18 +341,18 @@ pub const FCTL_SETSORTMODE: FILE_CONTROL_COMMANDS = 13;
 pub const FCTL_SETSORTORDER: FILE_CONTROL_COMMANDS = 14;
 
 pub type FARMESSAGEFLAGS = u32;
-pub const FMSG_WARNING: FARMESSAGEFLAGS             = 0x00000001;
-pub const FMSG_ERRORTYPE: FARMESSAGEFLAGS           = 0x00000002;
-pub const FMSG_KEEPBACKGROUND: FARMESSAGEFLAGS      = 0x00000004;
-pub const FMSG_LEFTALIGN: FARMESSAGEFLAGS           = 0x00000010;
-pub const FMSG_MB_OK: FARMESSAGEFLAGS               = 0x00010000;
-pub const FMSG_MB_OKCANCEL: FARMESSAGEFLAGS         = 0x00020000;
+pub const FMSG_WARNING: FARMESSAGEFLAGS = 0x00000001;
+pub const FMSG_ERRORTYPE: FARMESSAGEFLAGS = 0x00000002;
+pub const FMSG_KEEPBACKGROUND: FARMESSAGEFLAGS = 0x00000004;
+pub const FMSG_LEFTALIGN: FARMESSAGEFLAGS = 0x00000010;
+pub const FMSG_MB_OK: FARMESSAGEFLAGS = 0x00010000;
+pub const FMSG_MB_OKCANCEL: FARMESSAGEFLAGS = 0x00020000;
 
 pub type EDITOR_FLAGS = u32;
-pub const EF_NONMODAL: EDITOR_FLAGS              = 0x00000001;
+pub const EF_NONMODAL: EDITOR_FLAGS = 0x00000001;
 
 pub type VIEWER_FLAGS = u32;
-pub const VF_NONMODAL: VIEWER_FLAGS              = 0x00000001;
+pub const VF_NONMODAL: VIEWER_FLAGS = 0x00000001;
 
 #[macro_export]
 macro_rules! wstr {

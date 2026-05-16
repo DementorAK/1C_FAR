@@ -1,5 +1,5 @@
-use std::io::{self, Read, Seek, SeekFrom};
 use std::fs::File;
+use std::io::{self, Read, Seek, SeekFrom};
 
 /// Abstract positional reader trait for 1C artifact processing.
 pub trait V8Reader {
@@ -13,7 +13,10 @@ pub trait V8Reader {
         while offset < buf.len() {
             let n = self.read(&mut buf[offset..])?;
             if n == 0 {
-                return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Failed to fill whole buffer"));
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "Failed to fill whole buffer",
+                ));
             }
             offset += n;
         }
@@ -99,7 +102,7 @@ mod tests {
         reader.read_exact(&mut buf).unwrap();
         assert_eq!(buf, [1, 2]);
         assert_eq!(reader.pos().unwrap(), 2);
-        
+
         reader.set_pos(4).unwrap();
         let mut buf2 = [0u8; 1];
         reader.read_exact(&mut buf2).unwrap();

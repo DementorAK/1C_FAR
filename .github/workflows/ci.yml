@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows-far3:
+    name: Build & Check (Windows, far3)
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+        
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+      
+    - name: Run check
+      run: cargo check --all-targets
+      
+    - name: Run clippy
+      run: cargo clippy --all-targets -- -D warnings
+      
+    - name: Run tests
+      run: cargo test
+      
+    - name: Build release
+      run: cargo build --release
+
+  build-linux-far2:
+    name: Build & Check (Linux, far2)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+        
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+      
+    - name: Run check
+      run: cargo check --no-default-features --features far2 --all-targets
+      
+    - name: Run clippy
+      run: cargo clippy --no-default-features --features far2 --all-targets -- -D warnings
+      
+    - name: Run tests
+      run: cargo test --no-default-features --features far2
+      
+    - name: Build release
+      run: cargo build --no-default-features --features far2 --release

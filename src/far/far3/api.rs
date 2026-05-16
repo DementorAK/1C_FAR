@@ -43,16 +43,10 @@ pub struct FILETIME {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct INPUT_RECORD {
     pub EventType: WORD,
     pub Event: [u8; 18],
-}
-
-impl Default for INPUT_RECORD {
-    fn default() -> Self {
-        Self { EventType: 0, Event: [0; 18] }
-    }
 }
 
 #[repr(C)]
@@ -77,13 +71,27 @@ pub const INDEXMASK: u64 = 0x000000ff;
 pub const COLORMASK: u64 = 0x00ffffff;
 pub const ALPHAMASK: u64 = 0xff000000;
 
-pub fn INDEXVALUE(x: u64) -> u8 { (x & INDEXMASK) as u8 }
-pub fn COLORVALUE(x: u64) -> u32 { (x & COLORMASK) as u32 }
-pub fn ALPHAVALUE(x: u64) -> u8 { ((x & ALPHAMASK) >> 24) as u8 }
-pub fn IS_OPAQUE(x: u64) -> bool { (x & ALPHAMASK) == ALPHAMASK }
-pub fn IS_TRANSPARENT(x: u64) -> bool { (x & ALPHAMASK) == 0 }
-pub fn MAKE_OPAQUE(x: u64) -> u64 { x | ALPHAMASK }
-pub fn MAKE_TRANSPARENT(x: u64) -> u64 { x & COLORMASK }
+pub fn INDEXVALUE(x: u64) -> u8 {
+    (x & INDEXMASK) as u8
+}
+pub fn COLORVALUE(x: u64) -> u32 {
+    (x & COLORMASK) as u32
+}
+pub fn ALPHAVALUE(x: u64) -> u8 {
+    ((x & ALPHAMASK) >> 24) as u8
+}
+pub fn IS_OPAQUE(x: u64) -> bool {
+    (x & ALPHAMASK) == ALPHAMASK
+}
+pub fn IS_TRANSPARENT(x: u64) -> bool {
+    (x & ALPHAMASK) == 0
+}
+pub fn MAKE_OPAQUE(x: u64) -> u64 {
+    x | ALPHAMASK
+}
+pub fn MAKE_TRANSPARENT(x: u64) -> u64 {
+    x & COLORMASK
+}
 
 pub const PANEL_NONE: HANDLE = -1isize as HANDLE;
 pub const PANEL_ACTIVE: HANDLE = -1isize as HANDLE;
@@ -965,7 +973,8 @@ pub struct FarPanelItemFreeInfo {
     pub hPlugin: HANDLE,
 }
 
-pub type FARPANELITEMFREECALLBACK = Option<unsafe extern "system" fn(UserData: *mut c_void, Info: *const FarPanelItemFreeInfo)>;
+pub type FARPANELITEMFREECALLBACK =
+    Option<unsafe extern "system" fn(UserData: *mut c_void, Info: *const FarPanelItemFreeInfo)>;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -1526,7 +1535,10 @@ impl Default for FarMacroValueData {
 
 impl Default for FarMacroValue {
     fn default() -> Self {
-        Self { Type: FMVT_NIL, Value: FarMacroValueData::default() }
+        Self {
+            Type: FMVT_NIL,
+            Value: FarMacroValueData::default(),
+        }
     }
 }
 
@@ -1536,7 +1548,13 @@ pub struct FarMacroCall {
     pub StructSize: usize,
     pub Count: usize,
     pub Values: *mut FarMacroValue,
-    pub Callback: Option<unsafe extern "system" fn(CallbackData: *mut c_void, Values: *mut FarMacroValue, Count: usize)>,
+    pub Callback: Option<
+        unsafe extern "system" fn(
+            CallbackData: *mut c_void,
+            Values: *mut FarMacroValue,
+            Count: usize,
+        ),
+    >,
     pub CallbackData: *mut c_void,
 }
 
@@ -1566,7 +1584,8 @@ pub struct MacroSendMacroText {
     pub SequenceText: *const WCHAR,
 }
 
-pub type FARMACROCALLBACK = Option<unsafe extern "system" fn(Id: *mut c_void, Flags: FARADDKEYMACROFLAGS) -> IntPtr>;
+pub type FARMACROCALLBACK =
+    Option<unsafe extern "system" fn(Id: *mut c_void, Flags: FARADDKEYMACROFLAGS) -> IntPtr>;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -1745,7 +1764,9 @@ pub union FarSettingsEnumValue {
 
 impl Default for FarSettingsEnumValue {
     fn default() -> Self {
-        Self { Items: std::ptr::null() }
+        Self {
+            Items: std::ptr::null(),
+        }
     }
 }
 
@@ -2274,72 +2295,330 @@ pub struct DetectCodePageInfo {
 }
 
 // --- API Function Pointers ---
-pub type FARAPIMENU = Option<unsafe extern "system" fn(PluginId: *const GUID, Id: *const GUID, X: IntPtr, Y: IntPtr, MaxHeight: IntPtr, Flags: FARMENUFLAGS, Title: *const WCHAR, Bottom: *const WCHAR, HelpTopic: *const WCHAR, BreakKeys: *const FarKey, BreakCode: *mut IntPtr, Item: *const FarMenuItem, ItemsNumber: usize) -> IntPtr>;
-pub type FARAPIMESSAGE = Option<unsafe extern "system" fn(PluginId: *const GUID, Id: *const GUID, Flags: FARMESSAGEFLAGS, HelpTopic: *const WCHAR, Items: *const *const WCHAR, ItemsNumber: usize, ButtonsNumber: IntPtr) -> IntPtr>;
-pub type FARAPIGETMSG = Option<unsafe extern "system" fn(PluginId: *const GUID, MsgId: IntPtr) -> *const WCHAR>;
-pub type FARAPIPANELCONTROL = Option<unsafe extern "system" fn(hPanel: HANDLE, Command: FILE_CONTROL_COMMANDS, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPISAVESCREEN = Option<unsafe extern "system" fn(X1: IntPtr, Y1: IntPtr, X2: IntPtr, Y2: IntPtr) -> HANDLE>;
+pub type FARAPIMENU = Option<
+    unsafe extern "system" fn(
+        PluginId: *const GUID,
+        Id: *const GUID,
+        X: IntPtr,
+        Y: IntPtr,
+        MaxHeight: IntPtr,
+        Flags: FARMENUFLAGS,
+        Title: *const WCHAR,
+        Bottom: *const WCHAR,
+        HelpTopic: *const WCHAR,
+        BreakKeys: *const FarKey,
+        BreakCode: *mut IntPtr,
+        Item: *const FarMenuItem,
+        ItemsNumber: usize,
+    ) -> IntPtr,
+>;
+pub type FARAPIMESSAGE = Option<
+    unsafe extern "system" fn(
+        PluginId: *const GUID,
+        Id: *const GUID,
+        Flags: FARMESSAGEFLAGS,
+        HelpTopic: *const WCHAR,
+        Items: *const *const WCHAR,
+        ItemsNumber: usize,
+        ButtonsNumber: IntPtr,
+    ) -> IntPtr,
+>;
+pub type FARAPIGETMSG =
+    Option<unsafe extern "system" fn(PluginId: *const GUID, MsgId: IntPtr) -> *const WCHAR>;
+pub type FARAPIPANELCONTROL = Option<
+    unsafe extern "system" fn(
+        hPanel: HANDLE,
+        Command: FILE_CONTROL_COMMANDS,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPISAVESCREEN =
+    Option<unsafe extern "system" fn(X1: IntPtr, Y1: IntPtr, X2: IntPtr, Y2: IntPtr) -> HANDLE>;
 pub type FARAPIRESTORESCREEN = Option<unsafe extern "system" fn(hScreen: HANDLE)>;
 pub type FARAPIFREESCREEN = Option<unsafe extern "system" fn(hScreen: HANDLE)>;
-pub type FARAPIGETDIRLIST = Option<unsafe extern "system" fn(Dir: *const WCHAR, pPanelItem: *mut *mut PluginPanelItem, pItemsNumber: *mut usize) -> IntPtr>;
-pub type FARAPIGETPLUGINDIRLIST = Option<unsafe extern "system" fn(PluginId: *const GUID, hPanel: HANDLE, Dir: *const WCHAR, pPanelItem: *mut *mut PluginPanelItem, pItemsNumber: *mut usize) -> IntPtr>;
-pub type FARAPIFREEDIRLIST = Option<unsafe extern "system" fn(PanelItem: *mut PluginPanelItem, nItemsNumber: usize)>;
-pub type FARAPIFREEPLUGINDIRLIST = Option<unsafe extern "system" fn(hPanel: HANDLE, PanelItem: *mut PluginPanelItem, nItemsNumber: usize)>;
-pub type FARAPIVIEWER = Option<unsafe extern "system" fn(FileName: *const WCHAR, Title: *const WCHAR, X1: IntPtr, Y1: IntPtr, X2: IntPtr, Y2: IntPtr, Flags: VIEWER_FLAGS, CodePage: UIntPtr) -> IntPtr>;
-pub type FARAPIEDITOR = Option<unsafe extern "system" fn(FileName: *const WCHAR, Title: *const WCHAR, X1: IntPtr, Y1: IntPtr, X2: IntPtr, Y2: IntPtr, Flags: EDITOR_FLAGS, StartLine: IntPtr, StartChar: IntPtr, CodePage: UIntPtr) -> IntPtr>;
-pub type FARAPITEXT = Option<unsafe extern "system" fn(X: IntPtr, Y: IntPtr, Color: *const FarColor, Str: *const WCHAR)>;
-pub type FARAPIEDITORCONTROL = Option<unsafe extern "system" fn(EditorID: IntPtr, Command: i32, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPISHOWHELP = Option<unsafe extern "system" fn(ModuleName: *const WCHAR, Topic: *const WCHAR, Flags: FARHELPFLAGS) -> BOOL>;
-pub type FARAPIADVCONTROL = Option<unsafe extern "system" fn(PluginId: *const GUID, Command: ADVANCED_CONTROL_COMMANDS, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPIINPUTBOX = Option<unsafe extern "system" fn(PluginId: *const GUID, Id: *const GUID, Title: *const WCHAR, SubTitle: *const WCHAR, HistoryName: *const WCHAR, SrcText: *const WCHAR, DestText: *mut WCHAR, DestSize: usize, HelpTopic: *const WCHAR, Flags: INPUTBOXFLAGS) -> IntPtr>;
-pub type FARAPICOLORDIALOG = Option<unsafe extern "system" fn(PluginId: *const GUID, Flags: u64, Color: *mut FarColor) -> BOOL>;
-pub type FARAPIDIALOGINIT = Option<unsafe extern "system" fn(PluginId: *const GUID, Id: *const GUID, X1: IntPtr, Y1: IntPtr, X2: IntPtr, Y2: IntPtr, HelpTopic: *const WCHAR, Item: *const FarDialogItem, ItemsNumber: usize, Reserved: IntPtr, Flags: FARDIALOGFLAGS, DlgProc: FARWINDOWPROC, Param: *mut c_void) -> HANDLE>;
+pub type FARAPIGETDIRLIST = Option<
+    unsafe extern "system" fn(
+        Dir: *const WCHAR,
+        pPanelItem: *mut *mut PluginPanelItem,
+        pItemsNumber: *mut usize,
+    ) -> IntPtr,
+>;
+pub type FARAPIGETPLUGINDIRLIST = Option<
+    unsafe extern "system" fn(
+        PluginId: *const GUID,
+        hPanel: HANDLE,
+        Dir: *const WCHAR,
+        pPanelItem: *mut *mut PluginPanelItem,
+        pItemsNumber: *mut usize,
+    ) -> IntPtr,
+>;
+pub type FARAPIFREEDIRLIST =
+    Option<unsafe extern "system" fn(PanelItem: *mut PluginPanelItem, nItemsNumber: usize)>;
+pub type FARAPIFREEPLUGINDIRLIST = Option<
+    unsafe extern "system" fn(hPanel: HANDLE, PanelItem: *mut PluginPanelItem, nItemsNumber: usize),
+>;
+pub type FARAPIVIEWER = Option<
+    unsafe extern "system" fn(
+        FileName: *const WCHAR,
+        Title: *const WCHAR,
+        X1: IntPtr,
+        Y1: IntPtr,
+        X2: IntPtr,
+        Y2: IntPtr,
+        Flags: VIEWER_FLAGS,
+        CodePage: UIntPtr,
+    ) -> IntPtr,
+>;
+pub type FARAPIEDITOR = Option<
+    unsafe extern "system" fn(
+        FileName: *const WCHAR,
+        Title: *const WCHAR,
+        X1: IntPtr,
+        Y1: IntPtr,
+        X2: IntPtr,
+        Y2: IntPtr,
+        Flags: EDITOR_FLAGS,
+        StartLine: IntPtr,
+        StartChar: IntPtr,
+        CodePage: UIntPtr,
+    ) -> IntPtr,
+>;
+pub type FARAPITEXT = Option<
+    unsafe extern "system" fn(X: IntPtr, Y: IntPtr, Color: *const FarColor, Str: *const WCHAR),
+>;
+pub type FARAPIEDITORCONTROL = Option<
+    unsafe extern "system" fn(
+        EditorID: IntPtr,
+        Command: i32,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPISHOWHELP = Option<
+    unsafe extern "system" fn(
+        ModuleName: *const WCHAR,
+        Topic: *const WCHAR,
+        Flags: FARHELPFLAGS,
+    ) -> BOOL,
+>;
+pub type FARAPIADVCONTROL = Option<
+    unsafe extern "system" fn(
+        PluginId: *const GUID,
+        Command: ADVANCED_CONTROL_COMMANDS,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPIINPUTBOX = Option<
+    unsafe extern "system" fn(
+        PluginId: *const GUID,
+        Id: *const GUID,
+        Title: *const WCHAR,
+        SubTitle: *const WCHAR,
+        HistoryName: *const WCHAR,
+        SrcText: *const WCHAR,
+        DestText: *mut WCHAR,
+        DestSize: usize,
+        HelpTopic: *const WCHAR,
+        Flags: INPUTBOXFLAGS,
+    ) -> IntPtr,
+>;
+pub type FARAPICOLORDIALOG = Option<
+    unsafe extern "system" fn(PluginId: *const GUID, Flags: u64, Color: *mut FarColor) -> BOOL,
+>;
+pub type FARAPIDIALOGINIT = Option<
+    unsafe extern "system" fn(
+        PluginId: *const GUID,
+        Id: *const GUID,
+        X1: IntPtr,
+        Y1: IntPtr,
+        X2: IntPtr,
+        Y2: IntPtr,
+        HelpTopic: *const WCHAR,
+        Item: *const FarDialogItem,
+        ItemsNumber: usize,
+        Reserved: IntPtr,
+        Flags: FARDIALOGFLAGS,
+        DlgProc: FARWINDOWPROC,
+        Param: *mut c_void,
+    ) -> HANDLE,
+>;
 pub type FARAPIDIALOGRUN = Option<unsafe extern "system" fn(hDlg: HANDLE) -> IntPtr>;
 pub type FARAPIDIALOGFREE = Option<unsafe extern "system" fn(hDlg: HANDLE)>;
-pub type FARAPISENDDLGMESSAGE = Option<unsafe extern "system" fn(hDlg: HANDLE, Msg: IntPtr, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPIDEFDLGPROC = Option<unsafe extern "system" fn(hDlg: HANDLE, Msg: IntPtr, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPIVIEWERCONTROL = Option<unsafe extern "system" fn(ViewerID: IntPtr, Command: i32, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPIPLUGINSCONTROL = Option<unsafe extern "system" fn(hHandle: HANDLE, Command: i32, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPIFILEFILTERCONTROL = Option<unsafe extern "system" fn(hHandle: HANDLE, Command: i32, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPIREGEXPCONTROL = Option<unsafe extern "system" fn(hHandle: HANDLE, Command: i32, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPIMACROCONTROL = Option<unsafe extern "system" fn(PluginId: *const GUID, Command: i32, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
-pub type FARAPISETTINGSCONTROL = Option<unsafe extern "system" fn(hHandle: HANDLE, Command: i32, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
+pub type FARAPISENDDLGMESSAGE = Option<
+    unsafe extern "system" fn(
+        hDlg: HANDLE,
+        Msg: IntPtr,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPIDEFDLGPROC = Option<
+    unsafe extern "system" fn(
+        hDlg: HANDLE,
+        Msg: IntPtr,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPIVIEWERCONTROL = Option<
+    unsafe extern "system" fn(
+        ViewerID: IntPtr,
+        Command: i32,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPIPLUGINSCONTROL = Option<
+    unsafe extern "system" fn(
+        hHandle: HANDLE,
+        Command: i32,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPIFILEFILTERCONTROL = Option<
+    unsafe extern "system" fn(
+        hHandle: HANDLE,
+        Command: i32,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPIREGEXPCONTROL = Option<
+    unsafe extern "system" fn(
+        hHandle: HANDLE,
+        Command: i32,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPIMACROCONTROL = Option<
+    unsafe extern "system" fn(
+        PluginId: *const GUID,
+        Command: i32,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
+pub type FARAPISETTINGSCONTROL = Option<
+    unsafe extern "system" fn(
+        hHandle: HANDLE,
+        Command: i32,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
 
-pub type FARWINDOWPROC = Option<unsafe extern "system" fn(hDlg: HANDLE, Msg: IntPtr, Param1: IntPtr, Param2: *mut c_void) -> IntPtr>;
+pub type FARWINDOWPROC = Option<
+    unsafe extern "system" fn(
+        hDlg: HANDLE,
+        Msg: IntPtr,
+        Param1: IntPtr,
+        Param2: *mut c_void,
+    ) -> IntPtr,
+>;
 
 // Private API function types
-pub type FARAPICREATEFILE = Option<unsafe extern "system" fn(Object: *const WCHAR, DesiredAccess: DWORD, ShareMode: DWORD, SecurityAttributes: LPSECURITY_ATTRIBUTES, CreationDistribution: DWORD, FlagsAndAttributes: DWORD, TemplateFile: HANDLE) -> HANDLE>;
-pub type FARAPIGETFILEATTRIBUTES = Option<unsafe extern "system" fn(FileName: *const WCHAR) -> DWORD>;
-pub type FARAPISETFILEATTRIBUTES = Option<unsafe extern "system" fn(FileName: *const WCHAR, dwFileAttributes: DWORD) -> BOOL>;
-pub type FARAPIMOVEFILEEX = Option<unsafe extern "system" fn(ExistingFileName: *const WCHAR, NewFileName: *const WCHAR, dwFlags: DWORD) -> BOOL>;
+pub type FARAPICREATEFILE = Option<
+    unsafe extern "system" fn(
+        Object: *const WCHAR,
+        DesiredAccess: DWORD,
+        ShareMode: DWORD,
+        SecurityAttributes: LPSECURITY_ATTRIBUTES,
+        CreationDistribution: DWORD,
+        FlagsAndAttributes: DWORD,
+        TemplateFile: HANDLE,
+    ) -> HANDLE,
+>;
+pub type FARAPIGETFILEATTRIBUTES =
+    Option<unsafe extern "system" fn(FileName: *const WCHAR) -> DWORD>;
+pub type FARAPISETFILEATTRIBUTES =
+    Option<unsafe extern "system" fn(FileName: *const WCHAR, dwFileAttributes: DWORD) -> BOOL>;
+pub type FARAPIMOVEFILEEX = Option<
+    unsafe extern "system" fn(
+        ExistingFileName: *const WCHAR,
+        NewFileName: *const WCHAR,
+        dwFlags: DWORD,
+    ) -> BOOL,
+>;
 pub type FARAPIDELETEFILE = Option<unsafe extern "system" fn(FileName: *const WCHAR) -> BOOL>;
 pub type FARAPIREMOVEDIRECTORY = Option<unsafe extern "system" fn(DirName: *const WCHAR) -> BOOL>;
-pub type FARAPICREATEDIRECTORY = Option<unsafe extern "system" fn(PathName: *const WCHAR, lpSecurityAttributes: LPSECURITY_ATTRIBUTES) -> BOOL>;
-pub type FARAPICALLFAR = Option<unsafe extern "system" fn(CheckCode: IntPtr, Data: *mut FarMacroCall) -> IntPtr>;
+pub type FARAPICREATEDIRECTORY = Option<
+    unsafe extern "system" fn(
+        PathName: *const WCHAR,
+        lpSecurityAttributes: LPSECURITY_ATTRIBUTES,
+    ) -> BOOL,
+>;
+pub type FARAPICALLFAR =
+    Option<unsafe extern "system" fn(CheckCode: IntPtr, Data: *mut FarMacroCall) -> IntPtr>;
 
 // --- Standard Functions (FSF) ---
 pub type FARSTDSPRINTF = *mut c_void;
 pub type FARSTDSNPRINTF = *mut c_void;
 pub type FARSTDSSCANF = *mut c_void;
 
-pub type FARSTDQSORT = Option<unsafe extern "system" fn(base: *mut c_void, nelem: usize, width: usize, fcmp: Option<unsafe extern "system" fn(p1: *const c_void, p2: *const c_void, user: *mut c_void) -> i32>, userparam: *mut c_void)>;
-pub type FARSTDBSEARCH = Option<unsafe extern "system" fn(key: *const c_void, base: *const c_void, nelem: usize, width: usize, fcmp: Option<unsafe extern "system" fn(p1: *const c_void, p2: *const c_void, user: *mut c_void) -> i32>, userparam: *mut c_void) -> *mut c_void>;
-pub type FARSTDGETFILEOWNER = Option<unsafe extern "system" fn(Computer: *const WCHAR, Name: *const WCHAR, Owner: *mut WCHAR, Size: usize) -> usize>;
+pub type FARSTDQSORT = Option<
+    unsafe extern "system" fn(
+        base: *mut c_void,
+        nelem: usize,
+        width: usize,
+        fcmp: Option<
+            unsafe extern "system" fn(
+                p1: *const c_void,
+                p2: *const c_void,
+                user: *mut c_void,
+            ) -> i32,
+        >,
+        userparam: *mut c_void,
+    ),
+>;
+pub type FARSTDBSEARCH = Option<
+    unsafe extern "system" fn(
+        key: *const c_void,
+        base: *const c_void,
+        nelem: usize,
+        width: usize,
+        fcmp: Option<
+            unsafe extern "system" fn(
+                p1: *const c_void,
+                p2: *const c_void,
+                user: *mut c_void,
+            ) -> i32,
+        >,
+        userparam: *mut c_void,
+    ) -> *mut c_void,
+>;
+pub type FARSTDGETFILEOWNER = Option<
+    unsafe extern "system" fn(
+        Computer: *const WCHAR,
+        Name: *const WCHAR,
+        Owner: *mut WCHAR,
+        Size: usize,
+    ) -> usize,
+>;
 pub type FARSTDGETNUMBEROFLINKS = Option<unsafe extern "system" fn(Name: *const WCHAR) -> usize>;
 pub type FARSTDATOI = Option<unsafe extern "system" fn(s: *const WCHAR) -> i32>;
 pub type FARSTDATOI64 = Option<unsafe extern "system" fn(s: *const WCHAR) -> i64>;
-pub type FARSTDITOA64 = Option<unsafe extern "system" fn(value: i64, Str: *mut WCHAR, radix: i32) -> *mut WCHAR>;
-pub type FARSTDITOA = Option<unsafe extern "system" fn(value: i32, Str: *mut WCHAR, radix: i32) -> *mut WCHAR>;
+pub type FARSTDITOA64 =
+    Option<unsafe extern "system" fn(value: i64, Str: *mut WCHAR, radix: i32) -> *mut WCHAR>;
+pub type FARSTDITOA =
+    Option<unsafe extern "system" fn(value: i32, Str: *mut WCHAR, radix: i32) -> *mut WCHAR>;
 pub type FARSTDLTRIM = Option<unsafe extern "system" fn(Str: *mut WCHAR) -> *mut WCHAR>;
 pub type FARSTDRTRIM = Option<unsafe extern "system" fn(Str: *mut WCHAR) -> *mut WCHAR>;
 pub type FARSTDTRIM = Option<unsafe extern "system" fn(Str: *mut WCHAR) -> *mut WCHAR>;
-pub type FARSTDTRUNCSTR = Option<unsafe extern "system" fn(Str: *mut WCHAR, MaxLength: IntPtr) -> *mut WCHAR>;
-pub type FARSTDTRUNCPATHSTR = Option<unsafe extern "system" fn(Str: *mut WCHAR, MaxLength: IntPtr) -> *mut WCHAR>;
+pub type FARSTDTRUNCSTR =
+    Option<unsafe extern "system" fn(Str: *mut WCHAR, MaxLength: IntPtr) -> *mut WCHAR>;
+pub type FARSTDTRUNCPATHSTR =
+    Option<unsafe extern "system" fn(Str: *mut WCHAR, MaxLength: IntPtr) -> *mut WCHAR>;
 pub type FARSTDQUOTESPACEONLY = Option<unsafe extern "system" fn(Str: *mut WCHAR) -> *mut WCHAR>;
 pub type FARSTDPOINTTONAME = Option<unsafe extern "system" fn(Path: *const WCHAR) -> *const WCHAR>;
 pub type FARSTDADDENDSLASH = Option<unsafe extern "system" fn(Path: *mut WCHAR) -> BOOL>;
-pub type FARSTDCOPYTOCLIPBOARD = Option<unsafe extern "system" fn(Type: i32, Data: *const WCHAR) -> BOOL>;
-pub type FARSTDPASTEFROMCLIPBOARD = Option<unsafe extern "system" fn(Type: i32, Data: *mut WCHAR, Size: usize) -> usize>;
+pub type FARSTDCOPYTOCLIPBOARD =
+    Option<unsafe extern "system" fn(Type: i32, Data: *const WCHAR) -> BOOL>;
+pub type FARSTDPASTEFROMCLIPBOARD =
+    Option<unsafe extern "system" fn(Type: i32, Data: *mut WCHAR, Size: usize) -> usize>;
 pub type FARSTDLOCALISLOWER = Option<unsafe extern "system" fn(Ch: WCHAR) -> i32>;
 pub type FARSTDLOCALISUPPER = Option<unsafe extern "system" fn(Ch: WCHAR) -> i32>;
 pub type FARSTDLOCALISALPHA = Option<unsafe extern "system" fn(Ch: WCHAR) -> i32>;
@@ -2350,25 +2629,95 @@ pub type FARSTDLOCALUPPERBUF = Option<unsafe extern "system" fn(Buf: *mut WCHAR,
 pub type FARSTDLOCALLOWERBUF = Option<unsafe extern "system" fn(Buf: *mut WCHAR, Length: IntPtr)>;
 pub type FARSTDLOCALSTRUPR = Option<unsafe extern "system" fn(s1: *mut WCHAR)>;
 pub type FARSTDLOCALSTRLWR = Option<unsafe extern "system" fn(s1: *mut WCHAR)>;
-pub type FARSTDLOCALSTRICMP = Option<unsafe extern "system" fn(s1: *const WCHAR, s2: *const WCHAR) -> i32>;
-pub type FARSTDLOCALSTRNICMP = Option<unsafe extern "system" fn(s1: *const WCHAR, s2: *const WCHAR, n: IntPtr) -> i32>;
+pub type FARSTDLOCALSTRICMP =
+    Option<unsafe extern "system" fn(s1: *const WCHAR, s2: *const WCHAR) -> i32>;
+pub type FARSTDLOCALSTRNICMP =
+    Option<unsafe extern "system" fn(s1: *const WCHAR, s2: *const WCHAR, n: IntPtr) -> i32>;
 pub type FARSTDFARCLOCK = Option<unsafe extern "system" fn() -> u64>;
-pub type FARSTDCOMPARESTRINGS = Option<unsafe extern "system" fn(Str1: *const WCHAR, Size1: usize, Str2: *const WCHAR, Size2: usize) -> i32>;
-pub type FARSTDPROCESSNAME = Option<unsafe extern "system" fn(param1: *const WCHAR, param2: *mut WCHAR, size: usize, flags: PROCESSNAME_FLAGS) -> usize>;
+pub type FARSTDCOMPARESTRINGS = Option<
+    unsafe extern "system" fn(
+        Str1: *const WCHAR,
+        Size1: usize,
+        Str2: *const WCHAR,
+        Size2: usize,
+    ) -> i32,
+>;
+pub type FARSTDPROCESSNAME = Option<
+    unsafe extern "system" fn(
+        param1: *const WCHAR,
+        param2: *mut WCHAR,
+        size: usize,
+        flags: PROCESSNAME_FLAGS,
+    ) -> usize,
+>;
 pub type FARSTDUNQUOTE = Option<unsafe extern "system" fn(Str: *mut WCHAR)>;
-pub type FARSTDINPUTRECORDTOKEYNAME = Option<unsafe extern "system" fn(Key: *const INPUT_RECORD, KeyText: *mut WCHAR, Size: usize) -> usize>;
-pub type FARSTDXLAT = Option<unsafe extern "system" fn(Line: *mut WCHAR, StartPos: IntPtr, EndPos: IntPtr, Flags: XLAT_FLAGS) -> *mut WCHAR>;
-pub type FARSTDKEYNAMETOINPUTRECORD = Option<unsafe extern "system" fn(Name: *const WCHAR, Key: *mut INPUT_RECORD) -> BOOL>;
-pub type FRSUSERFUNC = Option<unsafe extern "system" fn(FData: *const PluginPanelItem, FullName: *const WCHAR, Param: *mut c_void) -> i32>;
-pub type FARSTDRECURSIVESEARCH = Option<unsafe extern "system" fn(InitDir: *const WCHAR, Mask: *const WCHAR, Func: FRSUSERFUNC, Flags: FRSMODE, Param: *mut c_void)>;
-pub type FARSTDMKTEMP = Option<unsafe extern "system" fn(Dest: *mut WCHAR, DestSize: usize, Prefix: *const WCHAR) -> usize>;
-pub type FARSTDGETPATHROOT = Option<unsafe extern "system" fn(Path: *const WCHAR, Root: *mut WCHAR, DestSize: usize) -> usize>;
-pub type FARSTDMKLINK = Option<unsafe extern "system" fn(Src: *const WCHAR, Dest: *const WCHAR, Type: LINK_TYPE, Flags: MKLINK_FLAGS) -> BOOL>;
-pub type FARGETREPARSEPOINTINFO = Option<unsafe extern "system" fn(Src: *const WCHAR, Dest: *mut WCHAR, DestSize: usize) -> usize>;
-pub type FARCONVERTPATH = Option<unsafe extern "system" fn(Mode: CONVERTPATHMODES, Src: *const WCHAR, Dest: *mut WCHAR, DestSize: usize) -> usize>;
-pub type FARGETCURRENTDIRECTORY = Option<unsafe extern "system" fn(Size: usize, Buffer: *mut WCHAR) -> usize>;
-pub type FARFORMATFILESIZE = Option<unsafe extern "system" fn(Size: u64, Width: IntPtr, Flags: FARFORMATFILESIZEFLAGS, Dest: *mut WCHAR, DestSize: usize) -> usize>;
-pub type FARSTDDETECTCODEPAGE = Option<unsafe extern "system" fn(Info: *mut DetectCodePageInfo) -> UIntPtr>;
+pub type FARSTDINPUTRECORDTOKEYNAME = Option<
+    unsafe extern "system" fn(Key: *const INPUT_RECORD, KeyText: *mut WCHAR, Size: usize) -> usize,
+>;
+pub type FARSTDXLAT = Option<
+    unsafe extern "system" fn(
+        Line: *mut WCHAR,
+        StartPos: IntPtr,
+        EndPos: IntPtr,
+        Flags: XLAT_FLAGS,
+    ) -> *mut WCHAR,
+>;
+pub type FARSTDKEYNAMETOINPUTRECORD =
+    Option<unsafe extern "system" fn(Name: *const WCHAR, Key: *mut INPUT_RECORD) -> BOOL>;
+pub type FRSUSERFUNC = Option<
+    unsafe extern "system" fn(
+        FData: *const PluginPanelItem,
+        FullName: *const WCHAR,
+        Param: *mut c_void,
+    ) -> i32,
+>;
+pub type FARSTDRECURSIVESEARCH = Option<
+    unsafe extern "system" fn(
+        InitDir: *const WCHAR,
+        Mask: *const WCHAR,
+        Func: FRSUSERFUNC,
+        Flags: FRSMODE,
+        Param: *mut c_void,
+    ),
+>;
+pub type FARSTDMKTEMP = Option<
+    unsafe extern "system" fn(Dest: *mut WCHAR, DestSize: usize, Prefix: *const WCHAR) -> usize,
+>;
+pub type FARSTDGETPATHROOT = Option<
+    unsafe extern "system" fn(Path: *const WCHAR, Root: *mut WCHAR, DestSize: usize) -> usize,
+>;
+pub type FARSTDMKLINK = Option<
+    unsafe extern "system" fn(
+        Src: *const WCHAR,
+        Dest: *const WCHAR,
+        Type: LINK_TYPE,
+        Flags: MKLINK_FLAGS,
+    ) -> BOOL,
+>;
+pub type FARGETREPARSEPOINTINFO = Option<
+    unsafe extern "system" fn(Src: *const WCHAR, Dest: *mut WCHAR, DestSize: usize) -> usize,
+>;
+pub type FARCONVERTPATH = Option<
+    unsafe extern "system" fn(
+        Mode: CONVERTPATHMODES,
+        Src: *const WCHAR,
+        Dest: *mut WCHAR,
+        DestSize: usize,
+    ) -> usize,
+>;
+pub type FARGETCURRENTDIRECTORY =
+    Option<unsafe extern "system" fn(Size: usize, Buffer: *mut WCHAR) -> usize>;
+pub type FARFORMATFILESIZE = Option<
+    unsafe extern "system" fn(
+        Size: u64,
+        Width: IntPtr,
+        Flags: FARFORMATFILESIZEFLAGS,
+        Dest: *mut WCHAR,
+        DestSize: usize,
+    ) -> usize,
+>;
+pub type FARSTDDETECTCODEPAGE =
+    Option<unsafe extern "system" fn(Info: *mut DetectCodePageInfo) -> UIntPtr>;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]

@@ -63,7 +63,7 @@ impl StructParser {
     /// Parse a single node (either a branch or a sequence of leaves)
     fn parse_node(source: &str, pos: &mut usize) -> Result<Node, ParseError> {
         Self::skip_ws(source, pos);
-        
+
         let bytes = source.as_bytes();
         if *pos >= bytes.len() {
             return Err(ParseError::UnexpectedEnd);
@@ -258,7 +258,8 @@ mod tests {
     fn test_deep_navigation() {
         // {0,1,2,3,{0,1,{0,1,{0,1,2,3,{0,1,2,leaf}}}}}
         // [4,2,2,4,3] = "leaf"
-        let parser = StructParser::new("{0,1,2,3,{0,1,{0,1,{0,1,2,3,{0,1,2,leaf}}}}}".to_string()).unwrap();
+        let parser =
+            StructParser::new("{0,1,2,3,{0,1,{0,1,{0,1,2,3,{0,1,2,leaf}}}}}".to_string()).unwrap();
         assert_eq!(parser.get_leaf(&[4, 2, 2, 4, 3]), Some("leaf"));
     }
 
@@ -288,7 +289,7 @@ mod tests {
         assert!(parser.get_leaf(&[1]).is_none()); // [1] is a branch, not a leaf
     }
 
-#[test]
+    #[test]
     fn test_with_nested_newlines() {
         let parser = StructParser::new("{a,\nb,\nc}".to_string()).unwrap();
         assert_eq!(parser.get_leaf(&[0]), Some("a"));

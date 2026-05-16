@@ -35,10 +35,7 @@ pub unsafe extern "C" fn OpenPluginW(open_from: i32, item: isize) -> HANDLE {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetOpenPluginInfoW(
-    h_plugin: HANDLE,
-    info: *mut OpenPluginInfo,
-) {
+pub unsafe extern "C" fn GetOpenPluginInfoW(h_plugin: HANDLE, info: *mut OpenPluginInfo) {
     // Fill out open plugin info for Far2
 }
 
@@ -50,13 +47,15 @@ pub unsafe extern "C" fn GetFindDataW(
     op_mode: i32,
 ) -> i32 {
     panic::catch_unwind(|| {
-        if h_plugin.is_null() { return 0; }
+        if h_plugin.is_null() {
+            return 0;
+        }
         let panel = &*(h_plugin as *const crate::far::panels::PluginPanel);
 
         let entries = panel.resolve_current_dir();
         if entries.is_empty() {
             *items_number = 0;
-            *panel_item   = std::ptr::null_mut();
+            *panel_item = std::ptr::null_mut();
             return 1;
         }
 
@@ -66,10 +65,11 @@ pub unsafe extern "C" fn GetFindDataW(
         let ptr_val = items_boxed.as_ptr();
         std::mem::forget(items_boxed);
 
-        *panel_item   = ptr_val as *mut PluginPanelItem;
+        *panel_item = ptr_val as *mut PluginPanelItem;
         *items_number = len as i32;
         1
-    }).unwrap_or(0)
+    })
+    .unwrap_or(0)
 }
 
 #[no_mangle]
@@ -81,11 +81,7 @@ pub unsafe extern "C" fn FreeFindDataW(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetDirectoryW(
-    h_plugin: HANDLE,
-    dir: *const u32,
-    op_mode: i32,
-) -> i32 {
+pub unsafe extern "C" fn SetDirectoryW(h_plugin: HANDLE, dir: *const u32, op_mode: i32) -> i32 {
     0
 }
 
@@ -114,15 +110,10 @@ pub unsafe extern "C" fn PutFilesW(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ClosePluginW(h_plugin: HANDLE) {
-}
+pub unsafe extern "C" fn ClosePluginW(h_plugin: HANDLE) {}
 
 #[no_mangle]
-pub unsafe extern "C" fn ProcessEventW(
-    h_plugin: HANDLE,
-    event: i32,
-    param: *mut c_void,
-) -> i32 {
+pub unsafe extern "C" fn ProcessEventW(h_plugin: HANDLE, event: i32, param: *mut c_void) -> i32 {
     0
 }
 
@@ -132,10 +123,11 @@ pub unsafe extern "C" fn ConfigureW(item_number: i32) -> i32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ExitFARW() {
-}
+pub unsafe extern "C" fn ExitFARW() {}
 
-fn vfs_to_panel_items(entries: &[crate::v8::vfs_builder::VfsEntry]) -> (Vec<PluginPanelItem>, Vec<*const u32>) {
+fn vfs_to_panel_items(
+    entries: &[crate::v8::vfs_builder::VfsEntry],
+) -> (Vec<PluginPanelItem>, Vec<*const u32>) {
     let mut items = Vec::new();
     let mut leaked_ptrs = Vec::new();
 

@@ -1,5 +1,5 @@
-use crate::far::{STARTUP_INFO, PLUGIN_GUID};
 use crate::far::api::IntPtr;
+use crate::far::{PLUGIN_GUID, STARTUP_INFO};
 
 #[repr(isize)]
 #[derive(Clone, Copy, Debug)]

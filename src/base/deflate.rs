@@ -1,5 +1,5 @@
-use std::io::{self, Read};
 use flate2::read::DeflateDecoder;
+use std::io::{self, Read};
 
 /// Inflates raw DEFLATE data.
 /// 1C uses raw DEFLATE without zlib or gzip headers.

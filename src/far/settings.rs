@@ -1,15 +1,10 @@
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum UnpackStyle {
     Raw = 0,
+    #[default]
     FullParse = 1,
     V8Unpack = 2,
     Saby = 3,
-}
-
-impl Default for UnpackStyle {
-    fn default() -> Self {
-        UnpackStyle::FullParse
-    }
 }
 
 /// Plugin settings.

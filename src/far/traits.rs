@@ -1,13 +1,13 @@
-/// `FarHost` — abstraction over Far Manager API version differences.
-///
-/// This trait is **not yet fully wired up** — it documents the intended
-/// interface for the future dual-API implementation.  The concrete
-/// implementations will live in `far::far3` (FAR 3, Windows) and
-/// `far::far2` (far2l/far2m, Linux).
-///
-/// For now (Phase 4A) the trait exists as a design artifact; the actual
-/// call-sites in `panels.rs` / `ui.rs` still go through the concrete
-/// API layer directly.  Phase 4B will complete the wiring.
+//! `FarHost` — abstraction over Far Manager API version differences.
+//!
+//! This trait is **not yet fully wired up** — it documents the intended
+//! interface for the future dual-API implementation.  The concrete
+//! implementations will live in `far::far3` (FAR 3, Windows) and
+//! `far::far2` (far2l/far2m, Linux).
+//!
+//! For now (Phase 4A) the trait exists as a design artifact; the actual
+//! call-sites in `panels.rs` / `ui.rs` still go through the concrete
+//! API layer directly.  Phase 4B will complete the wiring.
 
 /// Describes operations that differ between FAR 3 and FAR 2 Plugin APIs.
 #[allow(dead_code)]

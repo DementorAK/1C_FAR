@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use crate::base::parser::{strip_quotes, StructParser};
+use crate::base::reader::StringReader;
 use crate::v8::container::Container;
 use crate::v8::uuids;
-use crate::base::reader::StringReader;
-use crate::base::parser::{StructParser, strip_quotes};
+use std::collections::HashMap;
 
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
@@ -43,9 +43,8 @@ impl VfsEntry {
     }
 
     pub fn find_child(&self, name: &str) -> Option<&VfsEntry> {
-        self.children().and_then(|children| {
-            children.iter().find(|c| c.name() == name)
-        })
+        self.children()
+            .and_then(|children| children.iter().find(|c| c.name() == name))
     }
 
     pub fn file_data(&self) -> Option<&[u8]> {
@@ -91,7 +90,11 @@ impl VfsEntry {
 // ---------------------------------------------------------------------------
 
 fn strip_bom(data: &[u8]) -> &[u8] {
-    if data.starts_with(UTF8_BOM) { &data[3..] } else { data }
+    if data.starts_with(UTF8_BOM) {
+        &data[3..]
+    } else {
+        data
+    }
 }
 
 fn data_to_string(data: &[u8]) -> Option<String> {
@@ -102,16 +105,18 @@ fn data_to_string(data: &[u8]) -> Option<String> {
 /// Extract the text module from a row's .0 data (may be nested container).
 /// Returns (text_data, Option<full_container_data>).
 fn extract_module_text(data: &[u8]) -> Option<(Vec<u8>, Option<Vec<u8>>)> {
-    if data.is_empty() { return None; }
+    if data.is_empty() {
+        return None;
+    }
     if data.len() >= 4 {
         if let Ok(bytes) = data[0..4].try_into() {
             let sig = u32::from_le_bytes(bytes);
             if sig == crate::v8::container::SIG || (sig as u64) == crate::v8::container::SIG64 {
                 let reader = StringReader::new(data.to_vec());
                 if let Ok(mut container) = Container::new(reader, 0) {
-                    for row_res in container.rows() {
-                        if let Ok(row) = row_res {
-                            if row.id == "text" { return Some((row.data, Some(data.to_vec()))); }
+                    for row in container.rows().flatten() {
+                        if row.id == "text" {
+                            return Some((row.data, Some(data.to_vec())));
                         }
                     }
                 }
@@ -128,7 +133,8 @@ fn extract_item_name(header_data: &[u8]) -> Option<String> {
     let source = data_to_string(header_data)?;
     let parser = StructParser::new(source).ok()?;
     // Form name paths
-    parser.get_leaf(&[1, 1, 1, 1, 2])
+    parser
+        .get_leaf(&[1, 1, 1, 1, 2])
         // Template name path
         .or_else(|| parser.get_leaf(&[1, 2, 2]))
         // Common module / role / language name
@@ -141,13 +147,22 @@ fn extract_item_name(header_data: &[u8]) -> Option<String> {
 }
 
 fn is_protected_module(data: &[u8]) -> bool {
-    if data.is_empty() { return false; }
-    if data.starts_with(UTF8_BOM) { return false; }
+    if data.is_empty() {
+        return false;
+    }
+    if data.starts_with(UTF8_BOM) {
+        return false;
+    }
     if let Ok(s) = std::str::from_utf8(data) {
         let t = s.trim_start();
-        if t.starts_with("//") || t.starts_with("Процедура")
-            || t.starts_with("Функция") || t.starts_with("Procedure")
-            || t.starts_with("Function") { return false; }
+        if t.starts_with("//")
+            || t.starts_with("Процедура")
+            || t.starts_with("Функция")
+            || t.starts_with("Procedure")
+            || t.starts_with("Function")
+        {
+            return false;
+        }
     }
     true
 }
@@ -163,14 +178,17 @@ fn has_real_content(data: &[u8]) -> bool {
 
 // collect_rows removed
 
-fn parse_root(rows_map: &HashMap<String, Vec<u8>>) -> Result<(String, StructParser), BuildVfsError> {
+fn parse_root(
+    rows_map: &HashMap<String, Vec<u8>>,
+) -> Result<(String, StructParser), BuildVfsError> {
     // EPF/ERF/CF: have a "root" row with {2, UUID}
     if let Some(root_data) = rows_map.get("root") {
         let root_str = data_to_string(root_data)
             .ok_or_else(|| BuildVfsError::MetadataError("'root' not UTF-8".into()))?;
         let root_parser = StructParser::new(root_str)
             .map_err(|e| BuildVfsError::MetadataError(format!("root parse: {}", e)))?;
-        let root_uuid = root_parser.get_leaf(&[1])
+        let root_uuid = root_parser
+            .get_leaf(&[1])
             .ok_or_else(|| BuildVfsError::MetadataError("root[1] UUID missing".into()))?
             .to_string();
         return Ok((root_uuid, root_parser));
@@ -201,15 +219,22 @@ fn parse_root(rows_map: &HashMap<String, Vec<u8>>) -> Result<(String, StructPars
         return Ok((uuid_str, root_parser));
     }
 
-    Err(BuildVfsError::MetadataError("no 'root' or 'configinfo' found".into()))
+    Err(BuildVfsError::MetadataError(
+        "no 'root' or 'configinfo' found".into(),
+    ))
 }
 
-fn parse_object(rows_map: &HashMap<String, Vec<u8>>, uuid: &str) -> Result<StructParser, BuildVfsError> {
-    let data = rows_map.get(uuid)
+fn parse_object(
+    rows_map: &HashMap<String, Vec<u8>>,
+    uuid: &str,
+) -> Result<StructParser, BuildVfsError> {
+    let data = rows_map
+        .get(uuid)
         .ok_or_else(|| BuildVfsError::MetadataError(format!("object '{}' not found", uuid)))?;
     let s = data_to_string(data)
         .ok_or_else(|| BuildVfsError::MetadataError(format!("object '{}' not UTF-8", uuid)))?;
-    StructParser::new(s).map_err(|e| BuildVfsError::MetadataError(format!("parse '{}': {}", uuid, e)))
+    StructParser::new(s)
+        .map_err(|e| BuildVfsError::MetadataError(format!("parse '{}': {}", uuid, e)))
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +251,11 @@ struct SubordinateGroup {
 /// `parser` is the object parser, `base_path` is the path to the branch
 /// containing the subordinate groups (e.g., &[3,1] for EPF or &[] for CF objects).
 /// `start_idx` is the first index where subordinate groups begin.
-fn enumerate_subordinates(parser: &StructParser, base_path: &[usize], start_idx: usize) -> Vec<SubordinateGroup> {
+fn enumerate_subordinates(
+    parser: &StructParser,
+    base_path: &[usize],
+    start_idx: usize,
+) -> Vec<SubordinateGroup> {
     let mut groups = Vec::new();
     let branch_len = match parser.branch_len(base_path) {
         Some(len) => len,
@@ -263,7 +292,10 @@ fn enumerate_subordinates(parser: &StructParser, base_path: &[usize], start_idx:
             }
 
             if !instance_uuids.is_empty() && display_name != "Unknown" {
-                groups.push(SubordinateGroup { display_name, instance_uuids });
+                groups.push(SubordinateGroup {
+                    display_name,
+                    instance_uuids,
+                });
             }
         }
     }
@@ -294,7 +326,9 @@ fn build_subordinate_entries(
                 .unwrap_or_else(|| short_uuid(inst_uuid));
 
             if group.display_name == "Forms" {
-                let (module_data, orig_cont) = body.and_then(|b| extract_module_text(b)).unwrap_or((Vec::new(), None));
+                let (module_data, orig_cont) = body
+                    .and_then(|b| extract_module_text(b))
+                    .unwrap_or((Vec::new(), None));
                 let is_prot = is_protected_module(&module_data);
                 children.push(VfsEntry::Dir {
                     name,
@@ -342,7 +376,11 @@ fn build_subordinate_entries(
 }
 
 fn short_uuid(uuid: &str) -> String {
-    if uuid.len() >= 8 { uuid[..8].to_string() } else { uuid.to_string() }
+    if uuid.len() >= 8 {
+        uuid[..8].to_string()
+    } else {
+        uuid.to_string()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -357,8 +395,11 @@ fn build_single_object_vfs(
     let mut vfs = Vec::new();
 
     // ObjectModule.bsl from [3][1][1][3][1][1][2] → {uuid}.0
-    let module_uuid = root_obj.get_leaf(&[3, 1, 1, 3, 1, 1, 2]).map(|s| s.to_string());
-    let body_data = module_uuid.as_ref()
+    let module_uuid = root_obj
+        .get_leaf(&[3, 1, 1, 3, 1, 1, 2])
+        .map(|s| s.to_string());
+    let body_data = module_uuid
+        .as_ref()
         .and_then(|u| rows_map.get(&format!("{}.0", u)))
         .or_else(|| rows_map.get(&format!("{}.0", root_uuid)));
 
@@ -369,7 +410,9 @@ fn build_single_object_vfs(
                     name: "ObjectModule.bsl".to_string(),
                     is_protected: is_protected_module(&text),
                     data: text,
-                    origin_row_id: module_uuid.clone().map(|u| format!("{}.0", u))
+                    origin_row_id: module_uuid
+                        .clone()
+                        .map(|u| format!("{}.0", u))
                         .or_else(|| Some(format!("{}.0", root_uuid))),
                     original_container: orig_cont,
                 });
@@ -411,10 +454,11 @@ fn extract_object_name(rows_map: &HashMap<String, Vec<u8>>, uuid: &str) -> Strin
         if let Some(s) = data_to_string(data) {
             if let Ok(parser) = StructParser::new(s) {
                 // Try common paths for object name
-                let name = parser.get_leaf(&[1, 3, 1, 2])        // CF object
-                    .or_else(|| parser.get_leaf(&[3, 1, 1, 3, 1, 2]))  // EPF-like
-                    .or_else(|| parser.get_leaf(&[1, 1, 2]))            // simple objects (role, language)
-                    .or_else(|| parser.get_leaf(&[1, 2, 2]));           // template-like
+                let name = parser
+                    .get_leaf(&[1, 3, 1, 2]) // CF object
+                    .or_else(|| parser.get_leaf(&[3, 1, 1, 3, 1, 2])) // EPF-like
+                    .or_else(|| parser.get_leaf(&[1, 1, 2])) // simple objects (role, language)
+                    .or_else(|| parser.get_leaf(&[1, 2, 2])); // template-like
 
                 if let Some(n) = name {
                     let stripped = strip_quotes(n);
@@ -430,19 +474,18 @@ fn extract_object_name(rows_map: &HashMap<String, Vec<u8>>, uuid: &str) -> Strin
 
 /// Build VFS for a single CF top-level object (e.g., a Report or Catalog).
 /// Recursively includes its Forms, Templates, Commands, etc.
-fn build_cf_object_vfs(
-    rows_map: &HashMap<String, Vec<u8>>,
-    obj_uuid: &str,
-) -> Vec<VfsEntry> {
+fn build_cf_object_vfs(rows_map: &HashMap<String, Vec<u8>>, obj_uuid: &str) -> Vec<VfsEntry> {
     let mut children = Vec::new();
 
     // Try to parse the object descriptor and find its subordinates
     if let Ok(obj_parser) = parse_object(rows_map, obj_uuid) {
         // Object module: from [1][3][1][1][2] → {uuid}.0
-        let module_uuid = obj_parser.get_leaf(&[1, 3, 1, 1, 2])
+        let module_uuid = obj_parser
+            .get_leaf(&[1, 3, 1, 1, 2])
             .or_else(|| obj_parser.get_leaf(&[3, 1, 1, 3, 1, 1, 2]))
             .map(|s| s.to_string());
-        let body_data = module_uuid.as_ref()
+        let body_data = module_uuid
+            .as_ref()
             .and_then(|u| rows_map.get(&format!("{}.0", u)))
             .or_else(|| rows_map.get(&format!("{}.0", obj_uuid)));
 
@@ -453,7 +496,9 @@ fn build_cf_object_vfs(
                         name: "ObjectModule.bsl".to_string(),
                         is_protected: is_protected_module(&text),
                         data: text,
-                        origin_row_id: module_uuid.clone().map(|u| format!("{}.0", u))
+                        origin_row_id: module_uuid
+                            .clone()
+                            .map(|u| format!("{}.0", u))
                             .or_else(|| Some(format!("{}.0", obj_uuid))),
                         original_container: orig_cont,
                     });
@@ -465,12 +510,14 @@ fn build_cf_object_vfs(
         // In CF objects, subordinate types start at index [2] or [3] of root.
         // The count is at [2], subordinates at [3..].
         let count_str = obj_parser.get_leaf(&[2]).unwrap_or("0");
-        let start_idx: usize = count_str.parse::<usize>().ok()
-            .map(|_| 3)     // If [2] is a count, subordinates start at [3]
+        let start_idx: usize = count_str
+            .parse::<usize>()
+            .ok()
+            .map(|_| 3) // If [2] is a count, subordinates start at [3]
             .unwrap_or(3);
         let groups = enumerate_subordinates(&obj_parser, &[], start_idx);
         children.extend(build_subordinate_entries(rows_map, &groups));
-        
+
         // Fallback: if VFS empty, show raw non-utility rows for this object
         if children.is_empty() {
             let mut added = std::collections::HashSet::new();
@@ -486,7 +533,8 @@ fn build_cf_object_vfs(
             }
             let obj_0_key = format!("{}.0", obj_uuid);
             if let Some(data) = rows_map.get(&obj_0_key) {
-                let (module_data, orig_cont) = extract_module_text(data).unwrap_or((data.clone(), None));
+                let (module_data, orig_cont) =
+                    extract_module_text(data).unwrap_or((data.clone(), None));
                 children.push(VfsEntry::File {
                     name: obj_0_key.clone(),
                     data: module_data,
@@ -499,7 +547,8 @@ fn build_cf_object_vfs(
             if let Some(muid) = module_uuid {
                 if !added.contains(&muid) {
                     if let Some(data) = rows_map.get(&muid) {
-                        let (mdata, orig_cont) = extract_module_text(data).unwrap_or((data.clone(), None));
+                        let (mdata, orig_cont) =
+                            extract_module_text(data).unwrap_or((data.clone(), None));
                         children.push(VfsEntry::File {
                             name: format!("{}.0", muid),
                             data: mdata.clone(),
@@ -569,7 +618,8 @@ fn build_configuration_vfs(
                         let obj_children = build_cf_object_vfs(rows_map, obj_uuid);
 
                         obj_entries.push(VfsEntry::Dir {
-                            name: obj_name, children: obj_children,
+                            name: obj_name,
+                            children: obj_children,
                             origin_row_id: Some(obj_uuid.clone()),
                         });
                     }
@@ -617,22 +667,23 @@ fn build_configuration_vfs(
 fn is_configuration_format(rows_map: &HashMap<String, Vec<u8>>, root_uuid: &str) -> bool {
     // 1C 8.0+: The actual configuration metadata tree is structured with multiple groups.
     // In CF files, the main configuration descriptor can have UUID 7f84e2f0... or 30ffe4cc...
-    
+
     let empty_vec = Vec::new();
     let root_data = rows_map.get(root_uuid).unwrap_or(&empty_vec);
-    
+
     // Check if the raw string representation contains configuration-specific metadata group UUIDs
     let s = String::from_utf8_lossy(root_data).to_lowercase();
     let has_reports = s.contains("631b75a0-29e2-11d6-a3c7-0050bae0a776");
     let has_catalogs = s.contains("cf4abea6-37b2-11d4-940f-008048da11f9");
     let has_documents = s.contains("061d872a-5787-460e-95ac-ed74ea3a3e84");
-    let has_dataprocessors = s.contains("bf845118-327b-4682-b5c6-285d2a0eb296") || s.contains("84f1eb25-06ab-445a-8b89-9a2eb242cecd");
-    
+    let has_dataprocessors = s.contains("bf845118-327b-4682-b5c6-285d2a0eb296")
+        || s.contains("84f1eb25-06ab-445a-8b89-9a2eb242cecd");
+
     // CF has multiple groups
     let groups = [has_reports, has_catalogs, has_documents, has_dataprocessors];
     let group_count = groups.iter().filter(|&&x| x).count();
-    
-    group_count >= 1  // CF has at least one top-level group or Reports
+
+    group_count >= 1 // CF has at least one top-level group or Reports
 }
 
 /// Build VFS tree for any 1C container (EPF/ERF/CF/CFE).
@@ -645,15 +696,15 @@ fn is_configuration_format(rows_map: &HashMap<String, Vec<u8>>, root_uuid: &str)
 pub fn build_vfs(rows_map: &HashMap<String, Vec<u8>>) -> Result<Vec<VfsEntry>, BuildVfsError> {
     // CFE detection: has "configinfo" but no "root"
     if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
-        return build_extension_vfs(&rows_map);
+        return build_extension_vfs(rows_map);
     }
 
-    let (root_uuid, _root_parser) = parse_root(&rows_map)?;
-    
-    if is_configuration_format(&rows_map, &root_uuid) {
-        build_configuration_vfs(&rows_map, &root_uuid)
+    let (root_uuid, _root_parser) = parse_root(rows_map)?;
+
+    if is_configuration_format(rows_map, &root_uuid) {
+        build_configuration_vfs(rows_map, &root_uuid)
     } else {
-        build_single_object_vfs(&rows_map, &root_uuid)
+        build_single_object_vfs(rows_map, &root_uuid)
     }
 }
 
@@ -672,7 +723,9 @@ fn build_extension_vfs(
     let mut root_uuid: Option<String> = None;
     let mut root_size = 0;
     for (id, data) in rows_map {
-        if utility_rows.contains(&id.as_str()) || id.ends_with(".0") { continue; }
+        if utility_rows.contains(&id.as_str()) || id.ends_with(".0") {
+            continue;
+        }
         if id.contains('-') && data.len() > root_size {
             root_size = data.len();
             root_uuid = Some(id.clone());
@@ -699,12 +752,14 @@ fn build_extension_vfs(
                                 let obj_children = build_cf_object_vfs(rows_map, obj_uuid);
 
                                 obj_entries.push(VfsEntry::Dir {
-                                    name: obj_name, children: obj_children,
+                                    name: obj_name,
+                                    children: obj_children,
                                     origin_row_id: Some(obj_uuid.clone()),
                                 });
                             }
                             if !obj_entries.is_empty() {
-                                groups.entry(sub_group.display_name.clone())
+                                groups
+                                    .entry(sub_group.display_name.clone())
                                     .or_default()
                                     .extend(obj_entries);
                             }
@@ -716,8 +771,13 @@ fn build_extension_vfs(
     }
 
     // Build VFS from grouped entries
-    let mut vfs: Vec<VfsEntry> = groups.into_iter()
-        .map(|(name, children)| VfsEntry::Dir { name, children, origin_row_id: None })
+    let mut vfs: Vec<VfsEntry> = groups
+        .into_iter()
+        .map(|(name, children)| VfsEntry::Dir {
+            name,
+            children,
+            origin_row_id: None,
+        })
         .collect();
 
     // Sort groups alphabetically for consistent display
@@ -728,7 +788,9 @@ fn build_extension_vfs(
         for (id, data) in rows_map {
             if !utility_rows.contains(&id.as_str()) && !id.ends_with(".0") {
                 vfs.push(VfsEntry::File {
-                    name: id.clone(), data: data.clone(), is_protected: false,
+                    name: id.clone(),
+                    data: data.clone(),
+                    is_protected: false,
                     origin_row_id: Some(id.clone()),
                     original_container: None,
                 });
@@ -738,8 +800,6 @@ fn build_extension_vfs(
 
     Ok(vfs)
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -752,7 +812,9 @@ pub enum BuildVfsError {
 }
 
 impl From<std::io::Error> for BuildVfsError {
-    fn from(e: std::io::Error) -> Self { BuildVfsError::Io(e) }
+    fn from(e: std::io::Error) -> Self {
+        BuildVfsError::Io(e)
+    }
 }
 
 impl std::fmt::Display for BuildVfsError {

@@ -1,11 +1,11 @@
-/// Cross-platform wide string utilities for Far Plugin API.
-///
-/// FAR 3 / Windows: wchar_t = u16 (UTF-16)
-/// far2l / Linux:   wchar_t = u32 (UTF-32)
-///
-/// Use `to_wide` / `from_wide_ptr` in all API boundary code instead of
-/// calling `encode_utf16()` directly, to ensure the correct encoding is
-/// used for the current build target.
+//! Cross-platform wide string utilities for Far Plugin API.
+//!
+//! FAR 3 / Windows: wchar_t = u16 (UTF-16)
+//! far2l / Linux:   wchar_t = u32 (UTF-32)
+//!
+//! Use `to_wide` / `from_wide_ptr` in all API boundary code instead of
+//! calling `encode_utf16()` directly, to ensure the correct encoding is
+//! used for the current build target.
 
 // ── FAR 3 (far3 feature): wchar_t = u16 (UTF-16) ───────────────────────────
 
@@ -36,7 +36,10 @@ pub unsafe fn from_wide_ptr(ptr: *const u16) -> String {
 /// On far3 this is unused at the API level, but provided for symmetry.
 #[allow(dead_code)]
 pub fn to_wide32(s: &str) -> Vec<u32> {
-    s.chars().map(|c| c as u32).chain(std::iter::once(0u32)).collect()
+    s.chars()
+        .map(|c| c as u32)
+        .chain(std::iter::once(0u32))
+        .collect()
 }
 
 // ── far2 (far2 feature): wchar_t = u32 (UTF-32) ─────────────────────────────
@@ -44,7 +47,10 @@ pub fn to_wide32(s: &str) -> Vec<u32> {
 #[cfg(feature = "far2")]
 /// Convert a Rust &str to a NUL-terminated Vec<u32> (UTF-32).
 pub fn to_wide(s: &str) -> Vec<u32> {
-    s.chars().map(|c| c as u32).chain(std::iter::once(0u32)).collect()
+    s.chars()
+        .map(|c| c as u32)
+        .chain(std::iter::once(0u32))
+        .collect()
 }
 
 #[cfg(feature = "far2")]
@@ -61,9 +67,7 @@ pub unsafe fn from_wide_ptr(ptr: *const u32) -> String {
         len += 1;
     }
     let slice = std::slice::from_raw_parts(ptr, len as usize);
-    slice.iter()
-        .filter_map(|&c| char::from_u32(c))
-        .collect()
+    slice.iter().filter_map(|&c| char::from_u32(c)).collect()
 }
 
 #[cfg(feature = "far2")]

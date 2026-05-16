@@ -1,38 +1,48 @@
 use crate::far::api::*;
-use crate::far::{STARTUP_INFO, PLUGIN_GUID};
 use crate::far::lang::{get_msg, Msg};
+use crate::far::{PLUGIN_GUID, STARTUP_INFO};
 use std::ptr;
 
 #[cfg(feature = "far3")]
 pub fn show_progress(title: &str, message: &str, current: usize, total: usize) {
     unsafe {
         if let Some(psi) = STARTUP_INFO {
-            let percent = if total > 0 { (current * 100 / total) as u64 } else { 0 };
-            
+            let percent = (current * 100).checked_div(total).unwrap_or(0) as u64;
+
             // 1. Taskbar progress (ACTL_SETPROGRESSVALUE)
             if let Some(ac) = psi.AdvControl {
-                ac(&PLUGIN_GUID, ACTL_SETPROGRESSSTATE, PS_NORMAL as IntPtr, ptr::null_mut());
-                ac(&PLUGIN_GUID, ACTL_SETPROGRESSVALUE, 0, &percent as *const _ as *mut std::ffi::c_void);
+                ac(
+                    &PLUGIN_GUID,
+                    ACTL_SETPROGRESSSTATE,
+                    PS_NORMAL as IntPtr,
+                    ptr::null_mut(),
+                );
+                ac(
+                    &PLUGIN_GUID,
+                    ACTL_SETPROGRESSVALUE,
+                    0,
+                    &percent as *const _ as *mut std::ffi::c_void,
+                );
             }
-            
+
             // 2. Message box progress
             if let Some(msg_fn) = psi.Message {
                 let bar_width = 30;
-                let filled = if total > 0 { current * bar_width / total } else { 0 };
+                let filled = (current * bar_width).checked_div(total).unwrap_or(0);
                 let mut bar = String::new();
-                for _ in 0..filled { bar.push('█'); }
-                for _ in filled..bar_width { bar.push('░'); }
-                
+                for _ in 0..filled {
+                    bar.push('█');
+                }
+                for _ in filled..bar_width {
+                    bar.push('░');
+                }
+
                 let line1 = to_wide(&format!("{}: {}", get_msg(Msg::PackingMessage), message));
                 let line2 = to_wide(&format!("{} {}% ({} / {})", bar, percent, current, total));
                 let title_wide = to_wide(title);
-                
-                let items = [
-                    title_wide.as_ptr(),
-                    line1.as_ptr(),
-                    line2.as_ptr(),
-                ];
-                
+
+                let items = [title_wide.as_ptr(), line1.as_ptr(), line2.as_ptr()];
+
                 msg_fn(
                     &PLUGIN_GUID,
                     ptr::null(),
@@ -40,7 +50,7 @@ pub fn show_progress(title: &str, message: &str, current: usize, total: usize) {
                     ptr::null(),
                     items.as_ptr(),
                     items.len(),
-                    0
+                    0,
                 );
             }
         }
@@ -52,7 +62,12 @@ pub fn finish_progress() {
     unsafe {
         if let Some(psi) = STARTUP_INFO {
             if let Some(ac) = psi.AdvControl {
-                ac(&PLUGIN_GUID, ACTL_SETPROGRESSSTATE, PS_NOPROGRESS as IntPtr, ptr::null_mut());
+                ac(
+                    &PLUGIN_GUID,
+                    ACTL_SETPROGRESSSTATE,
+                    PS_NOPROGRESS as IntPtr,
+                    ptr::null_mut(),
+                );
             }
         }
     }
@@ -85,77 +100,133 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             // 0: Double box
             FarDialogItem {
                 Type: DI_DOUBLEBOX,
-                X1: 3, Y1: 1, X2: 60, Y2: 13,
+                X1: 3,
+                Y1: 1,
+                X2: 60,
+                Y2: 13,
                 Data: title.as_ptr(),
                 ..Default::default()
             },
             // 1: Checkbox (backup)
             FarDialogItem {
                 Type: DI_CHECKBOX,
-                X1: 5, Y1: 2, X2: 0, Y2: 0,
+                X1: 5,
+                Y1: 2,
+                X2: 0,
+                Y2: 0,
                 Data: backup_text.as_ptr(),
-                Param: FarDialogItemParam { Selected: if settings.create_backup { 1 } else { 0 } },
+                Param: FarDialogItemParam {
+                    Selected: if settings.create_backup { 1 } else { 0 },
+                },
                 Flags: DIF_FOCUS,
                 ..Default::default()
             },
             // 2: Separator
             FarDialogItem {
                 Type: DI_TEXT,
-                X1: 5, Y1: 3, X2: 0, Y2: 0,
+                X1: 5,
+                Y1: 3,
+                X2: 0,
+                Y2: 0,
                 Flags: DIF_SEPARATOR,
                 ..Default::default()
             },
             // 3: Style label
             FarDialogItem {
                 Type: DI_TEXT,
-                X1: 5, Y1: 4, X2: 0, Y2: 0,
+                X1: 5,
+                Y1: 4,
+                X2: 0,
+                Y2: 0,
                 Data: style_label.as_ptr(),
                 ..Default::default()
             },
             // 4: Radio Raw
             FarDialogItem {
                 Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 5, X2: 0, Y2: 0,
+                X1: 7,
+                Y1: 5,
+                X2: 0,
+                Y2: 0,
                 Data: style_raw.as_ptr(),
-                Param: FarDialogItemParam { Selected: if settings.unpack_style == UnpackStyle::Raw { 1 } else { 0 } },
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::Raw {
+                        1
+                    } else {
+                        0
+                    },
+                },
                 Flags: DIF_GROUP,
                 ..Default::default()
             },
             // 5: Radio Full
             FarDialogItem {
                 Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 6, X2: 0, Y2: 0,
+                X1: 7,
+                Y1: 6,
+                X2: 0,
+                Y2: 0,
                 Data: style_full.as_ptr(),
-                Param: FarDialogItemParam { Selected: if settings.unpack_style == UnpackStyle::FullParse { 1 } else { 0 } },
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::FullParse {
+                        1
+                    } else {
+                        0
+                    },
+                },
                 ..Default::default()
             },
             // 6: Radio V8
             FarDialogItem {
                 Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 7, X2: 0, Y2: 0,
+                X1: 7,
+                Y1: 7,
+                X2: 0,
+                Y2: 0,
                 Data: style_v8.as_ptr(),
-                Param: FarDialogItemParam { Selected: if settings.unpack_style == UnpackStyle::V8Unpack { 1 } else { 0 } },
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::V8Unpack {
+                        1
+                    } else {
+                        0
+                    },
+                },
                 ..Default::default()
             },
             // 7: Radio Saby
             FarDialogItem {
                 Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 8, X2: 0, Y2: 0,
+                X1: 7,
+                Y1: 8,
+                X2: 0,
+                Y2: 0,
                 Data: style_saby.as_ptr(),
-                Param: FarDialogItemParam { Selected: if settings.unpack_style == UnpackStyle::Saby { 1 } else { 0 } },
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::Saby {
+                        1
+                    } else {
+                        0
+                    },
+                },
                 ..Default::default()
             },
             // 8: Separator
             FarDialogItem {
                 Type: DI_TEXT,
-                X1: 5, Y1: 10, X2: 0, Y2: 0,
+                X1: 5,
+                Y1: 10,
+                X2: 0,
+                Y2: 0,
                 Flags: DIF_SEPARATOR,
                 ..Default::default()
             },
             // 9: OK
             FarDialogItem {
                 Type: DI_BUTTON,
-                X1: 0, Y1: 11, X2: 0, Y2: 0,
+                X1: 0,
+                Y1: 11,
+                X2: 0,
+                Y2: 0,
                 Data: ok_text.as_ptr(),
                 Flags: DIF_CENTERGROUP | DIF_DEFAULTBUTTON,
                 ..Default::default()
@@ -163,7 +234,10 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             // 10: Cancel
             FarDialogItem {
                 Type: DI_BUTTON,
-                X1: 0, Y1: 11, X2: 0, Y2: 0,
+                X1: 0,
+                Y1: 11,
+                X2: 0,
+                Y2: 0,
                 Data: cancel_text.as_ptr(),
                 Flags: DIF_CENTERGROUP,
                 ..Default::default()
@@ -185,21 +259,29 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             None,
             ptr::null_mut(),
         );
-        
+
         if h_dlg == INVALID_HANDLE_VALUE {
             return None;
         }
 
         let ret = dr(h_dlg);
-        if ret == 9 { // OK button index
-            let mut new_settings = PluginSettings::default();
-            new_settings.create_backup = sc(h_dlg, DM_GETCHECK as IntPtr, 1, ptr::null_mut()) != 0;
-            
-            if sc(h_dlg, DM_GETCHECK as IntPtr, 4, ptr::null_mut()) != 0 { new_settings.unpack_style = UnpackStyle::Raw; }
-            else if sc(h_dlg, DM_GETCHECK as IntPtr, 5, ptr::null_mut()) != 0 { new_settings.unpack_style = UnpackStyle::FullParse; }
-            else if sc(h_dlg, DM_GETCHECK as IntPtr, 6, ptr::null_mut()) != 0 { new_settings.unpack_style = UnpackStyle::V8Unpack; }
-            else if sc(h_dlg, DM_GETCHECK as IntPtr, 7, ptr::null_mut()) != 0 { new_settings.unpack_style = UnpackStyle::Saby; }
-            
+        if ret == 9 {
+            // OK button index
+            let mut new_settings = PluginSettings {
+                create_backup: sc(h_dlg, DM_GETCHECK as IntPtr, 1, ptr::null_mut()) != 0,
+                ..Default::default()
+            };
+
+            if sc(h_dlg, DM_GETCHECK as IntPtr, 4, ptr::null_mut()) != 0 {
+                new_settings.unpack_style = UnpackStyle::Raw;
+            } else if sc(h_dlg, DM_GETCHECK as IntPtr, 5, ptr::null_mut()) != 0 {
+                new_settings.unpack_style = UnpackStyle::FullParse;
+            } else if sc(h_dlg, DM_GETCHECK as IntPtr, 6, ptr::null_mut()) != 0 {
+                new_settings.unpack_style = UnpackStyle::V8Unpack;
+            } else if sc(h_dlg, DM_GETCHECK as IntPtr, 7, ptr::null_mut()) != 0 {
+                new_settings.unpack_style = UnpackStyle::Saby;
+            }
+
             df(h_dlg);
             Some(new_settings)
         } else {
