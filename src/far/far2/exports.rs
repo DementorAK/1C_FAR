@@ -1,6 +1,7 @@
+#![allow(clippy::missing_safety_doc)]
+
 use crate::far::far2::api::*;
 
-use crate::far::panels;
 use std::ffi::c_void;
 use std::panic;
 
@@ -21,21 +22,21 @@ pub unsafe extern "C" fn GetPluginInfoW(info: *mut PluginInfo) {
 
 #[no_mangle]
 pub unsafe extern "C" fn OpenFilePluginW(
-    name: *const u32,
-    data: *const u8,
-    data_size: i32,
-    op_mode: i32,
+    _name: *const u32,
+    _data: *const u8,
+    _data_size: i32,
+    _op_mode: i32,
 ) -> HANDLE {
     std::ptr::null_mut()
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn OpenPluginW(open_from: i32, item: isize) -> HANDLE {
+pub unsafe extern "C" fn OpenPluginW(_open_from: i32, _item: isize) -> HANDLE {
     std::ptr::null_mut()
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn GetOpenPluginInfoW(h_plugin: HANDLE, info: *mut OpenPluginInfo) {
+pub unsafe extern "C" fn GetOpenPluginInfoW(_h_plugin: HANDLE, _info: *mut OpenPluginInfo) {
     // Fill out open plugin info for Far2
 }
 
@@ -44,7 +45,7 @@ pub unsafe extern "C" fn GetFindDataW(
     h_plugin: HANDLE,
     panel_item: *mut *mut PluginPanelItem,
     items_number: *mut i32,
-    op_mode: i32,
+    _op_mode: i32,
 ) -> i32 {
     panic::catch_unwind(|| {
         if h_plugin.is_null() {
@@ -74,51 +75,51 @@ pub unsafe extern "C" fn GetFindDataW(
 
 #[no_mangle]
 pub unsafe extern "C" fn FreeFindDataW(
-    h_plugin: HANDLE,
-    panel_item: *mut PluginPanelItem,
-    items_number: i32,
+    _h_plugin: HANDLE,
+    _panel_item: *mut PluginPanelItem,
+    _items_number: i32,
 ) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn SetDirectoryW(h_plugin: HANDLE, dir: *const u32, op_mode: i32) -> i32 {
+pub unsafe extern "C" fn SetDirectoryW(_h_plugin: HANDLE, _dir: *const u32, _op_mode: i32) -> i32 {
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn GetFilesW(
-    h_plugin: HANDLE,
-    panel_item: *mut PluginPanelItem,
-    items_number: i32,
-    move_files: i32,
-    dest_path: *mut *mut u32,
-    op_mode: i32,
+    _h_plugin: HANDLE,
+    _panel_item: *mut PluginPanelItem,
+    _items_number: i32,
+    _move_files: i32,
+    _dest_path: *mut *mut u32,
+    _op_mode: i32,
 ) -> i32 {
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PutFilesW(
-    h_plugin: HANDLE,
-    panel_item: *mut PluginPanelItem,
-    items_number: i32,
-    move_files: i32,
-    src_path: *const u32,
-    op_mode: i32,
+    _h_plugin: HANDLE,
+    _panel_item: *mut PluginPanelItem,
+    _items_number: i32,
+    _move_files: i32,
+    _src_path: *const u32,
+    _op_mode: i32,
 ) -> i32 {
     0
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ClosePluginW(h_plugin: HANDLE) {}
+pub unsafe extern "C" fn ClosePluginW(_h_plugin: HANDLE) {}
 
 #[no_mangle]
-pub unsafe extern "C" fn ProcessEventW(h_plugin: HANDLE, event: i32, param: *mut c_void) -> i32 {
+pub unsafe extern "C" fn ProcessEventW(_h_plugin: HANDLE, _event: i32, _param: *mut c_void) -> i32 {
     0
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ConfigureW(item_number: i32) -> i32 {
+pub unsafe extern "C" fn ConfigureW(_item_number: i32) -> i32 {
     0
 }
 

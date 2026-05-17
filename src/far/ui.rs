@@ -1,6 +1,10 @@
+#[cfg(feature = "far3")]
 use crate::far::api::*;
+#[cfg(feature = "far3")]
 use crate::far::lang::{get_msg, Msg};
+#[cfg(feature = "far3")]
 use crate::far::{PLUGIN_GUID, STARTUP_INFO};
+#[cfg(feature = "far3")]
 use std::ptr;
 
 #[cfg(feature = "far3")]
@@ -73,8 +77,11 @@ pub fn finish_progress() {
     }
 }
 
-use crate::far::settings::{PluginSettings, UnpackStyle};
+use crate::far::settings::PluginSettings;
+#[cfg(feature = "far3")]
+use crate::far::settings::UnpackStyle;
 
+#[cfg(feature = "far3")]
 const INVALID_HANDLE_VALUE: HANDLE = -1isize as HANDLE;
 
 #[cfg(feature = "far3")]
@@ -292,7 +299,7 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
 }
 
 #[cfg(feature = "far2")]
-pub fn show_progress(title: &str, message: &str, current: usize, total: usize) {
+pub fn show_progress(_title: &str, _message: &str, _current: usize, _total: usize) {
     // TODO: implement FAR2 progress
 }
 
@@ -302,7 +309,7 @@ pub fn finish_progress() {
 }
 
 #[cfg(feature = "far2")]
-pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings> {
+pub fn show_settings_dialog(_settings: &PluginSettings) -> Option<PluginSettings> {
     // TODO: implement FAR2 settings dialog
     None
 }

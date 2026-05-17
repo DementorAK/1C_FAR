@@ -1,5 +1,7 @@
 use crate::far::api::IntPtr;
-use crate::far::{PLUGIN_GUID, STARTUP_INFO};
+#[cfg(feature = "far3")]
+use crate::far::PLUGIN_GUID;
+use crate::far::STARTUP_INFO;
 
 #[repr(isize)]
 #[derive(Clone, Copy, Debug)]
