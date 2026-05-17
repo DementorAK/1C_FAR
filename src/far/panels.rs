@@ -294,7 +294,9 @@ fn sync_nodes_to_map(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>
                             writer.pad_pt_to_page = false;
                             writer.revision = 6;
                             let mut buffer = Vec::new();
-                            if writer.write(&mut buffer, &nested_rows, None::<fn(usize, usize)>).is_ok()
+                            if writer
+                                .write(&mut buffer, &nested_rows, None::<fn(usize, usize)>)
+                                .is_ok()
                             {
                                 final_data = buffer;
                             }
