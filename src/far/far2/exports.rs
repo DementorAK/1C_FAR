@@ -5,6 +5,21 @@ use crate::far::far2::api::*;
 use std::ffi::c_void;
 use std::panic;
 
+/// far2l-specific: called when the .so is loaded, before SetStartupInfoW.
+/// Receives the filesystem path to the plugin module.
+#[no_mangle]
+pub unsafe extern "C" fn PluginModuleOpen(_path: *const std::ffi::c_char) {
+    // far2l calls this at dlopen time to inform the plugin of its own path.
+    // Can be used for module-relative resource loading in the future.
+}
+
+/// Returns the minimum FAR API version required by this plugin.
+/// MAKEFARVERSION(major, minor) = (major << 16) | minor
+#[no_mangle]
+pub unsafe extern "C" fn GetMinFarVersionW() -> i32 {
+    (2 << 16) | 6 // FAR 2.6
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn SetStartupInfoW(info: *const PluginStartupInfo) {
     if !info.is_null() {
