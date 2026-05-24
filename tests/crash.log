@@ -1,0 +1,225 @@
+
+🔥🔥🔥 far2l 2.6.0-beta x64
+Signal 0B [0000000000000000] on 000000006A1148DE
+000062578BE5F010 0000000000000010 000062578BF4EC50 *&"#%,/'#0,-(0,0
+000000000000000C 000062578BF4EC50 0000000000000010 000062578BF4EC50
+),0"&+(-!!!!'#&' 0000000000000000 00007FFD41CB26F0 00007FFD41CB22E0
+0000000000000004 4C316A1000006257 0000000000000001 00007FFD41CB2200
+00007275B659F4A2 0000000000010246 002B000000000033 0000000000000000
+000000000000000D 0000000000000000 0000000000000000 00007FFD41CB1E00
+0000000000000000 00007FFD41CB1DC0 00007275B8EAC1D5 0000000000000000
+0000000000000000 0000000000000000 0000000000000000 0000000000000073
+far2l(+0x185cd9)[0x62574c33fcd9]
+/lib/x86_64-linux-gnu/libc.so.6(+0x45330)[0x7275b8e45330]
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide(GetPluginInfoW+0xf2)[0x7275b659f4a2]
+far2l(+0x168f1c)[0x62574c322f1c]
+far2l(+0x162d72)[0x62574c31cd72]
+far2l(+0x165a94)[0x62574c31fa94]
+far2l(+0x167bbd)[0x62574c321bbd]
+far2l(+0xdd9aa)[0x62574c2979aa]
+far2l(+0xe0f22)[0x62574c29af22]
+far2l(+0x20081d)[0x62574c3ba81d]
+far2l(+0x452b6)[0x62574c1ff2b6]
+/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca)[0x7275b8e2a1ca]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b)[0x7275b8e2a28b]
+far2l(_start+0x25)[0x62574c202415]
+far2l + 0x185cd9
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a2
+far2l + 0x168f1c
+far2l + 0x162d72
+far2l + 0x165a94
+far2l + 0x167bbd
+far2l + 0xdd9aa
+far2l + 0xe0f22
+far2l + 0x20081d
+far2l + 0x452b6
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a1ca
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a28b
+far2l + 0x48415
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a2
+/lib/x86_64-linux-gnu/libc.so.6 + 0xac1d5
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0xab43a
+[2026/05/23 06:27] 196@sSigaction: see /home/dima/.config/far2l/crash.log
+
+🔥🔥🔥 far2l 2.6.0-beta x64
+Signal 0B [0000000000000000] on 000000006A1148FD
+000055E953FAD010 0000000000000010 000055E95409CC50 )+-"+0/'/"&."!.(
+000000000000000C 000055E95409CC50 0000000000000010 000055E95409CC50
+54063A7C000055E9 0000000000000000 00007FFEE0C93D00 00007FFEE0C938F0
+0000000000000004 266CAA10000055E9 0000000000000001 00007FFEE0C93810
+000077760FD124A2 0000000000010246 002B000000000033 0000000000000000
+000000000000000D 0000000000000000 0000000000000000 00007FFEE0C93440
+0000000000000000 0000000000000073 000000000000003F 000077760FC03B20
+000077760FC03B20 0000000000000000 0000000000001C20 000077760FC03AC0
+far2l(+0x185cd9)[0x55e9266f3cd9]
+/lib/x86_64-linux-gnu/libc.so.6(+0x45330)[0x77760fa45330]
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide(GetPluginInfoW+0xf2)[0x77760fd124a2]
+far2l(+0x168f1c)[0x55e9266d6f1c]
+far2l(+0x162d72)[0x55e9266d0d72]
+far2l(+0x165a94)[0x55e9266d3a94]
+far2l(+0x167bbd)[0x55e9266d5bbd]
+far2l(+0xdd9aa)[0x55e92664b9aa]
+far2l(+0xe0f22)[0x55e92664ef22]
+far2l(+0x20081d)[0x55e92676e81d]
+far2l(+0x452b6)[0x55e9265b32b6]
+/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca)[0x77760fa2a1ca]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b)[0x77760fa2a28b]
+far2l(_start+0x25)[0x55e9265b6415]
+far2l + 0x185cd9
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a2
+far2l + 0x168f1c
+far2l + 0x162d72
+far2l + 0x165a94
+far2l + 0x167bbd
+far2l + 0xdd9aa
+far2l + 0xe0f22
+far2l + 0x20081d
+far2l + 0x452b6
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a1ca
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a28b
+far2l + 0x48415
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a2
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203ac0
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203ac0
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+far2l + 0x1f3577
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xc6c2
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x37d7e
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a4
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xc6c2
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xc6c3
+far2l + 0x168f1c
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xb4ef
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2044e0
+far2l + 0x162300
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2044e0
+far2l + 0x162d72
+far2l + 0x165a94
+/lib/x86_64-linux-gnu/libstdc++.so.6 + 0x1e8e85
+far2l + 0x167bbd
+far2l + 0x32ba70
+/lib/x86_64-linux-gnu/libc.so.6 + 0xaddce
+far2l + 0x32cc20
+far2l + 0x32cc20
+[2026/05/23 06:28] 196@sSigaction: see /home/dima/.config/far2l/crash.log
+
+🔥🔥🔥 far2l 2.6.0-beta x64
+Signal 0B [0000000000000000] on 000000006A115EF0
+00005AA53A3C7010 0000000000000010 00005AA53A4B6DC0 04037D312B4A0B30
+000000000000000C 00005AA53A4B6DC0 0000000000000010 00005AA53A4B6DC0
+3A47F59C00005AA5 0000000000000000 00007FFE30FC8FC0 00007FFE30FC8BB0
+0000000000000004 1E9A8A1000005AA5 0000000000000001 00007FFE30FC8AD0
+00007C76164554A2 0000000000010246 002B000000000033 0000000000000000
+000000000000000D 0000000000000000 0000000000000000 00007FFE30FC8700
+0000000000000000 0000000000000073 000000000000003F 00007C7616403B20
+00007C7616403B20 0000000000000000 0000000000001C20 00007C7616403AC0
+far2l(+0x185cd9)[0x5aa51e9d1cd9]
+/lib/x86_64-linux-gnu/libc.so.6(+0x45330)[0x7c7616245330]
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide(GetPluginInfoW+0xf2)[0x7c76164554a2]
+far2l(+0x168f1c)[0x5aa51e9b4f1c]
+far2l(+0x162d72)[0x5aa51e9aed72]
+far2l(+0x165a94)[0x5aa51e9b1a94]
+far2l(+0x167bbd)[0x5aa51e9b3bbd]
+far2l(+0xdd9aa)[0x5aa51e9299aa]
+far2l(+0xe0f22)[0x5aa51e92cf22]
+far2l(+0x20081d)[0x5aa51ea4c81d]
+far2l(+0x452b6)[0x5aa51e8912b6]
+/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca)[0x7c761622a1ca]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b)[0x7c761622a28b]
+far2l(_start+0x25)[0x5aa51e894415]
+far2l + 0x185cd9
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a2
+far2l + 0x168f1c
+far2l + 0x162d72
+far2l + 0x165a94
+far2l + 0x167bbd
+far2l + 0xdd9aa
+far2l + 0xe0f22
+far2l + 0x20081d
+far2l + 0x452b6
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a1ca
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a28b
+far2l + 0x48415
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a2
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203ac0
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203ac0
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+far2l + 0x1f3577
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xc6c2
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x37d7e
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x344a4
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xc6c2
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xc6c3
+far2l + 0x168f1c
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0xb4ef
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2044e0
+far2l + 0x162300
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2044e0
+far2l + 0x162d72
+[2026/05/23 08:01] 196@sSigaction: see /home/dima/.config/far2l/crash.log
+
+🔥🔥🔥 far2l 2.6.0-beta x64
+Signal 0B [0000000000000000] on 000000006A128F5C
+00005F1023657010 0000000000000007 00005F1023746FA0 +0(,"%')!"'0"'.#
+00007FFC8AA1FEA0 00005F1023671140 0000000000000000 00007FFC8AA1FE80
+00007FFC8AA1FE70 00005F1002D2313C 00007FFC8AA20080 00005F102370D4A0
+0000000000000000 23704CB000000000 0000000000000000 00007FFC8AA1FC30
+00005F1002C4B307 0000000000010202 002B000000000033 0000000000000000
+000000000000000D 0000000000000000 0000000000000000 00007FFC8AA1F840
+00007FFC8AA1F7D0 0000000000000007 00000000000001C0 0000783CF0A03B20
+0000000000003700 00007FFC8AA1F7B0 2578C1530C78F300 00007FFC8AA1F7B0
+far2l(+0x185cd9)[0x5f1002c67cd9]
+/lib/x86_64-linux-gnu/libc.so.6(+0x45330)[0x783cf0845330]
+far2l(+0x169307)[0x5f1002c4b307]
+far2l(+0x162d72)[0x5f1002c44d72]
+far2l(+0x165a94)[0x5f1002c47a94]
+far2l(+0x167bbd)[0x5f1002c49bbd]
+far2l(+0xdd9aa)[0x5f1002bbf9aa]
+far2l(+0xe0f22)[0x5f1002bc2f22]
+far2l(+0x20081d)[0x5f1002ce281d]
+far2l(+0x452b6)[0x5f1002b272b6]
+/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca)[0x783cf082a1ca]
+/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b)[0x783cf082a28b]
+far2l(_start+0x25)[0x5f1002b2a415]
+/lib/x86_64-linux-gnu/libc.so.6 + 0x60d88
+far2l + 0x245c48
+far2l + 0x185cd9
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+far2l + 0x169307
+far2l + 0x162d72
+far2l + 0x165a94
+far2l + 0x167bbd
+far2l + 0xdd9aa
+far2l + 0xe0f22
+far2l + 0x20081d
+far2l + 0x452b6
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a1ca
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2a28b
+far2l + 0x48415
+/lib/x86_64-linux-gnu/libc.so.6 + 0x45330
+far2l + 0x24113c
+far2l + 0x169307
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0xac4de
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/lib/x86_64-linux-gnu/libc.so.6 + 0x203b20
+/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide + 0x8bb01
+far2l + 0x239c66
+/lib/x86_64-linux-gnu/libc.so.6 + 0xaddce
+far2l + 0x1690ab
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2044e0
+far2l + 0x162300
+/lib/x86_64-linux-gnu/libc.so.6 + 0x2044e0
+[2026/05/24 05:40] 196@sSigaction: see /home/dima/.config/far2l/crash.log
