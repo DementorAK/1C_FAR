@@ -17,7 +17,7 @@ pub const PANEL_NONE: HANDLE = -1isize as HANDLE;
 pub const PANEL_ACTIVE: HANDLE = -1isize as HANDLE;
 pub const PANEL_PASSIVE: HANDLE = -2isize as HANDLE;
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct GUID {
     pub Data1: u32,
@@ -29,7 +29,7 @@ pub struct GUID {
 pub const TRUE: BOOL = 1;
 pub const FALSE: BOOL = 0;
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct RECT {
     pub left: i32,
@@ -38,14 +38,14 @@ pub struct RECT {
     pub bottom: i32,
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct FILETIME {
     pub dwLowDateTime: u32,
     pub dwHighDateTime: u32,
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct FAR_FIND_DATA {
     pub ftCreationTime: FILETIME,
@@ -58,7 +58,7 @@ pub struct FAR_FIND_DATA {
     pub lpwszFileName: *const WCHAR,
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct PluginPanelItem {
     pub FindData: FAR_FIND_DATA,
@@ -74,7 +74,7 @@ pub struct PluginPanelItem {
     pub Reserved: [usize; 2],
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct PluginInfo {
     pub StructSize: i32,
@@ -156,7 +156,7 @@ pub type FARAPIFILEFILTERCONTROL = *mut c_void;
 pub type FARAPIREGEXPCONTROL = *mut c_void;
 pub type FARAPICOLORDIALOG = *mut c_void;
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy)]
 pub struct PluginStartupInfo {
     pub StructSize: i32,
@@ -223,7 +223,7 @@ pub const OPIF_RAWSELECTION: OPENPLUGININFO_FLAGS = 0x00000010;
 pub const OPIF_REALNAMES: OPENPLUGININFO_FLAGS = 0x00000020;
 pub const OPIF_SHOWNAMESONLY: OPENPLUGININFO_FLAGS = 0x00000040;
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct InfoPanelLine {
     pub Text: *const WCHAR,
@@ -231,7 +231,7 @@ pub struct InfoPanelLine {
     pub Separator: i32,
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct PanelMode {
     pub ColumnTypes: *const WCHAR,
@@ -246,7 +246,7 @@ pub struct PanelMode {
     pub Reserved: [DWORD; 2],
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy)]
 pub struct KeyBarTitles {
     pub Titles: [*mut WCHAR; 12],
@@ -264,7 +264,7 @@ impl Default for KeyBarTitles {
     }
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy)]
 pub struct OpenPluginInfo {
     pub StructSize: i32,
@@ -325,7 +325,7 @@ pub const PTYPE_TREEPANEL: PANELINFOTYPE = 1;
 pub const PTYPE_QVIEWPANEL: PANELINFOTYPE = 2;
 pub const PTYPE_INFOPANEL: PANELINFOTYPE = 3;
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct PanelInfo {
     pub PanelType: i32,

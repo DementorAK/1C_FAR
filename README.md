@@ -41,14 +41,16 @@ cargo build --release
 
 ### Linux (far2l)
 
-1. Build the plugin for Linux:
+The easiest way to install on Linux is using the provided installation script, which builds the plugin and copies it to the system FHS directories.
+
+1. Make the script executable and run it:
    ```bash
-   cargo build --release --no-default-features --features far2
+   chmod +x install_linux.sh
+   ./install_linux.sh
    ```
-2. Create plugin directory: `~/.config/far2l/Plugins/far1c/`
-3. Copy `target/release/libfar1c.so` to the plugin directory
-4. Copy language files `far1c_en.lng` and `far1c_ru.lng` to the same directory
-5. Restart far2l
+2. Restart far2l
+
+> **Note:** The script uses `sudo` to install the plugin binary to `/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide` and language files to `/usr/share/far2l/Plugins/far1c/plug/` in accordance with the far2l FHS standard.
 
 > **Note:** Language files (`*.lng`) are required for proper localization of the plugin UI. Without them, the plugin will display raw message IDs instead of translated strings.
 

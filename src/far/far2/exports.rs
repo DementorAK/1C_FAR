@@ -44,7 +44,7 @@ pub unsafe extern "C" fn GetPluginInfoW(info: *mut PluginInfo) {
 
         // far2l does NOT zero the struct before calling — we must do it ourselves
         // to avoid reading garbage from DiskMenuStrings, Reserved0, etc.
-        std::ptr::write(info, PluginInfo {
+        std::ptr::write_unaligned(info, PluginInfo {
             StructSize: std::mem::size_of::<PluginInfo>() as i32,
             Flags: 0,
             DiskMenuStrings: ptr::null(),
@@ -417,7 +417,7 @@ unsafe fn get_current_panel_path() -> Option<String> {
         0,
         item_data.as_mut_ptr() as IntPtr,
     );
-    let item = &*(item_data.as_ptr() as *const PluginPanelItem);
+    let item = std::ptr::read_unaligned(item_data.as_ptr() as *const PluginPanelItem);
     let name_ptr = item.FindData.lpwszFileName;
     if name_ptr.is_null() {
         return None;
