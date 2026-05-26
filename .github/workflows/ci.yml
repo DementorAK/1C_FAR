@@ -36,12 +36,15 @@ jobs:
       
     - name: Build release
       run: cargo build --release
+
+    - name: Assemble dist (far3)
+      run: Copy-Item target\release\far1c.dll target\release\far3\far1c.dll
       
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: far1c-windows-x64
-        path: target/release/far1c.dll
+        path: target/release/far3/
         retention-days: 14
 
   build-linux-far2:
@@ -69,10 +72,13 @@ jobs:
       
     - name: Build release
       run: cargo build --no-default-features --features far2 --release
-      
+
+    - name: Assemble dist (far2)
+      run: cp target/release/libfar1c.so target/release/far2/far1c.far-plug-wide
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: far1c-linux-x64
-        path: target/release/libfar1c.so
+        path: target/release/far2/
         retention-days: 14

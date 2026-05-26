@@ -134,19 +134,23 @@ pub unsafe extern "C" fn OpenPluginW(open_from: i32, _item: isize) -> HANDLE {
 // ── Panel info ─────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub unsafe extern "C" fn GetOpenPluginInfoW(_h_plugin: HANDLE, info: *mut OpenPluginInfo) {
+pub unsafe extern "C" fn GetOpenPluginInfoW(h_plugin: HANDLE, info: *mut OpenPluginInfo) {
     let _ = panic::catch_unwind(|| {
-        if info.is_null() {
+        if info.is_null() || h_plugin.is_null() {
             return;
         }
         let info = &mut *info;
         info.StructSize = std::mem::size_of::<OpenPluginInfo>() as i32;
         info.Flags = OPIF_USEFILTER | OPIF_ADDDOTS | OPIF_RAWSELECTION;
+        
+        let panel = &*(h_plugin as *const PluginPanel);
+        let title = panel.panel_title();
+        
         info.PanelTitle = Box::leak(
-            crate::far::string_utils::to_wide(" 1C:Enterprise Artifacts ").into_boxed_slice(),
+            crate::far::string_utils::to_wide(&title).into_boxed_slice(),
         )
         .as_ptr();
-        info.CurDir = Box::leak(crate::far::string_utils::to_wide("\\").into_boxed_slice()).as_ptr();
+        info.CurDir = Box::leak(crate::far::string_utils::to_wide(&panel.cur_dir_str()).into_boxed_slice()).as_ptr();
         info.Format =
             Box::leak(crate::far::string_utils::to_wide("1C").into_boxed_slice()).as_ptr();
         info.HostFile = ptr::null();
@@ -224,7 +228,18 @@ pub unsafe extern "C" fn SetDirectoryW(h_plugin: HANDLE, dir: *const u32, _op_mo
         }
         let panel = &mut *(h_plugin as *mut PluginPanel);
         let dir_str = crate::far::string_utils::from_wide_ptr(dir);
-        if panel.set_directory(&dir_str) { 1 } else { 0 }
+        if panel.set_directory(&dir_str) { 
+            1 
+        } else { 
+            if dir_str == ".." || dir_str == "\\" || dir_str == "/" || dir_str.is_empty() {
+                if let Some(psi) = crate::far::STARTUP_INFO {
+                    if let Some(control) = psi.Control {
+                        control(h_plugin, crate::far::far2::api::FCTL_CLOSEPLUGIN, 0, 0);
+                    }
+                }
+            }
+            0 
+        }
     })
     .unwrap_or(0)
 }
@@ -331,13 +346,65 @@ pub unsafe extern "C" fn ClosePluginW(h_plugin: HANDLE) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ProcessEventW(_h_plugin: HANDLE, _event: i32, _param: *mut c_void) -> i32 {
-    panic::catch_unwind(|| 0).unwrap_or(0)
+pub unsafe extern "C" fn ProcessEventW(h_plugin: HANDLE, event: i32, _param: *mut c_void) -> i32 {
+    panic::catch_unwind(|| {
+        if h_plugin.is_null() {
+            return 0;
+        }
+        let panel = &mut *(h_plugin as *mut PluginPanel);
+        
+        // FE_CLOSE == 3
+        if event == 3 && panel.is_modified {
+            let msg_title = crate::far::string_utils::to_wide("Сохранение");
+            let msg_text = crate::far::string_utils::to_wide("Состав контейнера был изменен. Сохранить?");
+            let btn_yes = crate::far::string_utils::to_wide("Да");
+            let btn_no = crate::far::string_utils::to_wide("Нет");
+            let btn_cancel = crate::far::string_utils::to_wide("Отмена");
+
+            let items = [
+                msg_title.as_ptr(),
+                msg_text.as_ptr(),
+                btn_yes.as_ptr(),
+                btn_no.as_ptr(),
+                btn_cancel.as_ptr(),
+            ];
+
+            if let Some(psi) = crate::far::STARTUP_INFO {
+                if let Some(message_fn) = psi.Message {
+                    let res = message_fn(
+                        psi.ModuleNumber,
+                        crate::far::far2::api::FMSG_WARNING,
+                        ptr::null(),
+                        items.as_ptr(),
+                        items.len() as i32,
+                        3,
+                    );
+                    match res {
+                        0 => {
+                            if let Err(e) = panel.commit_changes() {
+                                log::info!("Failed to save changes: {}", e);
+                                return 1;
+                            }
+                            return 0;
+                        }
+                        1 => return 0,
+                        _ => return 1,
+                    }
+                }
+            }
+        }
+        0
+    }).unwrap_or(0)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ConfigureW(_item_number: i32) -> i32 {
-    panic::catch_unwind(|| 0).unwrap_or(0)
+    let current_settings = crate::far::settings::PluginSettings::load();
+    if let Some(new_settings) = crate::far::ui::show_settings_dialog(&current_settings) {
+        new_settings.save();
+        return 1;
+    }
+    0
 }
 
 #[no_mangle]

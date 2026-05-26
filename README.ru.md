@@ -26,31 +26,49 @@
 **Требования:** [Rust toolchain](https://rustup.rs/) (1.88+)
 
 ```bash
+# Windows / FAR Manager 3 (по умолчанию)
 cargo build --release
+# → пакет дистрибутива: target/release/far3/
+
+# Linux / far2l / far2m
+cargo build --release --no-default-features --features far2
+# → пакет дистрибутива: target/release/far2/
 ```
-*(Примечание: сборка по умолчанию настроена под Windows / FAR 3)*
+
+После release-сборки `build.rs` автоматически собирает готовый к развёртыванию каталог:
+
+| Сборка | Выходной каталог | Содержимое |
+|--------|-----------------|------------|
+| `far3` (по умолчанию) | `target/release/far3/` | `far1c.dll`, `far1c_en.lng`, `far1c_ru.lng` |
+| `far2` | `target/release/far2/` | `far1c.far-plug-wide`, `far1c_en.lng`, `far1c_ru.lng`, `copy_to_far2l.sh` |
+
+> **Примечание:** `build.rs` подготавливает файлы `.lng` и вспомогательный скрипт. CI или ручной шаг ниже копирует скомпилированную библиотеку в тот же каталог с правильным именем.
 
 ### Windows (FAR Manager 3)
 
-1. Собрать плагин (см. выше)
-2. Создать каталог плагина: `%FARHOME%\Plugins\far1c\`
-3. Скопировать `target\release\far1c.dll` в каталог плагина
-4. Скопировать языковые файлы `far1c_en.lng` и `far1c_ru.lng` в тот же каталог
-5. Перезапустить FAR Manager
-6. Плагин появится в меню `F11`
+1. Собрать плагин: `cargo build --release`
+2. Скопировать `target\release\far1c.dll` в `target\release\far3\` (CI делает это автоматически)
+3. Скопировать весь каталог `target\release\far3\` в `%FARHOME%\Plugins\far1c\`
+4. Перезапустить FAR Manager — плагин появится в меню `F11`
 
 ### Linux (far2l)
 
-Самый простой способ установки в Linux — использовать скрипт установки, который собирает плагин и копирует его в нужные FHS-каталоги системы.
-
-1. Сделайте скрипт исполняемым и запустите его:
+1. Собрать плагин:
    ```bash
-   chmod +x install_linux.sh
-   ./install_linux.sh
+   cargo build --release --no-default-features --features far2
    ```
-2. Перезапустите far2l
+2. Скопировать скомпилированную библиотеку в dist-каталог:
+   ```bash
+   cp target/release/libfar1c.so target/release/far2/far1c.far-plug-wide
+   ```
+3. Запустить скрипт для установки в системные FHS-каталоги:
+   ```bash
+   chmod +x dist/copy_to_far2l.sh
+   dist/copy_to_far2l.sh
+   ```
+4. Перезапустить far2l
 
-> **Важно:** Скрипт использует `sudo` для установки бинарного файла плагина в `/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide` и файлов локализации в `/usr/share/far2l/Plugins/far1c/plug/` в соответствии со стандартом FHS far2l. Языковые файлы необходимы для корректной локализации интерфейса плагина.
+> **Важно:** Скрипт использует `sudo` для установки бинарного файла плагина в `/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide` и файлов локализации в `/usr/share/far2l/Plugins/far1c/plug/` в соответствии со стандартом FHS far2l.
 
 > **Важно:** Языковые файлы (`*.lng`) необходимы для корректной локализации интерфейса плагина. Без них вместо текста будут отображаться идентификаторы сообщений.
 

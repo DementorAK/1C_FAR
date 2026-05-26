@@ -17,9 +17,11 @@ Thank you for your interest in contributing to **far1c**! This document provides
 cargo build
 
 # Release build (Windows / FAR 3 default)
+# → assembles dist to target/release/far3/ (*.lng copied by build.rs)
 cargo build --release
 
-# Release build (Linux / far2l)
+# Release build (Linux / far2l / far2m)
+# → assembles dist to target/release/far2/ (*.lng + copy_to_far2l.sh copied by build.rs)
 cargo build --release --no-default-features --features far2
 
 # Run tests
@@ -28,25 +30,30 @@ cargo test
 
 ### Installing for Testing
 
-After building, copy the plugin files to FAR Manager's plugin directory:
+After a release build, `build.rs` automatically assembles a dist directory with all files needed for deployment:
 
-**Windows:**
+| Build | Output directory | Contents |
+|-------|-----------------|----------|
+| `far3` (default) | `target/release/far3/` | `far1c.dll` \*, `far1c_en.lng`, `far1c_ru.lng` |
+| `far2` | `target/release/far2/` | `far1c.far-plug-wide` \*, `far1c_en.lng`, `far1c_ru.lng`, `copy_to_far2l.sh` |
+
+\* The library binary must be copied into the dist directory as a separate step (done automatically by CI).
+
+**Windows** — copy the entire `target\release\far3\` to `%FARHOME%\Plugins\far1c\`:
 ```cmd
-copy target\release\far1c.dll "%FARHOME%\Plugins\far1c\"
-copy far1c_en.lng "%FARHOME%\Plugins\far1c\"
-copy far1c_ru.lng "%FARHOME%\Plugins\far1c\"
+:: After: cargo build --release
+copy target\release\far1c.dll target\release\far3\far1c.dll
+xcopy /E /I target\release\far3 "%FARHOME%\Plugins\far1c\"
 ```
 
-**Linux:**
+**Linux (far2l)** — copy library then run `copy_to_far2l.sh`:
 ```bash
-# far2l uses the FHS standard for plugins
-sudo mkdir -p /usr/lib/far2l/Plugins/far1c
-sudo cp target/release/libfar1c.so /usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide
-
-sudo mkdir -p /usr/share/far2l/Plugins/far1c/plug
-sudo cp far1c_en.lng far1c_ru.lng /usr/share/far2l/Plugins/far1c/plug/
+# After: cargo build --release --no-default-features --features far2
+cp target/release/libfar1c.so target/release/far2/far1c.far-plug-wide
+chmod +x dist/copy_to_far2l.sh
+dist/copy_to_far2l.sh
 ```
-Or you can simply use the provided `install_linux.sh` script.
+The script installs the plugin binary to `/usr/lib/far2l/Plugins/far1c/` and language files to `/usr/share/far2l/Plugins/far1c/plug/` (requires `sudo`).
 
 ## Project Structure
 

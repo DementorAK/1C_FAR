@@ -1,0 +1,14 @@
+.Language=English,English
+
+"1C:Enterprise Artifacts"
+"1C:Enterprise Artifacts Settings"
+"Create backup before saving"
+"Unpacking style:"
+"Raw (binary blobs)"
+"Full-parse (structured files)"
+"V8Unpack-style (.header + .data)"
+"Saby-style (readable for Git)"
+"OK"
+"Cancel"
+"Saving"
+"Packing"

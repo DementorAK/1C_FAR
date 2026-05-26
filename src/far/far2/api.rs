@@ -17,6 +17,7 @@ pub const PANEL_NONE: HANDLE = -1isize as HANDLE;
 pub const PANEL_ACTIVE: HANDLE = -1isize as HANDLE;
 pub const PANEL_PASSIVE: HANDLE = -2isize as HANDLE;
 
+
 #[repr(C, packed(2))]
 #[derive(Clone, Copy, Default)]
 pub struct GUID {
@@ -376,4 +377,51 @@ macro_rules! wstr {
     ($s:expr) => {
         $crate::far::string_utils::to_wide($s).as_ptr()
     };
+}
+
+pub unsafe fn from_wide_ptr(ptr: *const WCHAR) -> String {
+    crate::far::string_utils::from_wide_ptr(ptr)
+}
+
+// --- Windows Registry FFI (WinPort) ---
+pub type HKEY = *mut c_void;
+pub type LSTATUS = i32;
+
+pub const HKEY_CURRENT_USER: HKEY = 0x80000001u32 as usize as HKEY;
+pub const KEY_ALL_ACCESS: u32 = 0xF003F;
+pub const REG_DWORD: u32 = 4;
+pub const ERROR_SUCCESS: LSTATUS = 0;
+
+extern "C" {
+    pub fn RegCreateKeyExW(
+        hKey: HKEY,
+        lpSubKey: *const u32,
+        Reserved: u32,
+        lpClass: *const u32,
+        dwOptions: u32,
+        samDesired: u32,
+        lpSecurityAttributes: *mut c_void,
+        phkResult: *mut HKEY,
+        lpdwDisposition: *mut u32,
+    ) -> LSTATUS;
+
+    pub fn RegSetValueExW(
+        hKey: HKEY,
+        lpValueName: *const u32,
+        Reserved: u32,
+        dwType: u32,
+        lpData: *const u8,
+        cbData: u32,
+    ) -> LSTATUS;
+
+    pub fn RegQueryValueExW(
+        hKey: HKEY,
+        lpValueName: *const u32,
+        lpReserved: *mut u32,
+        lpType: *mut u32,
+        lpData: *mut u8,
+        lpcbData: *mut u32,
+    ) -> LSTATUS;
+
+    pub fn RegCloseKey(hKey: HKEY) -> LSTATUS;
 }

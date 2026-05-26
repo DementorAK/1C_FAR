@@ -26,29 +26,47 @@ A cross-platform plugin for **FAR Manager** / **far2l** that provides transparen
 **Prerequisites:** [Rust toolchain](https://rustup.rs/) (1.88+)
 
 ```bash
+# Windows / FAR Manager 3 (default)
 cargo build --release
+# → dist package: target/release/far3/
+
+# Linux / far2l / far2m
+cargo build --release --no-default-features --features far2
+# → dist package: target/release/far2/
 ```
-*(Note: Windows/FAR 3 is the default build target)*
+
+After a release build, `build.rs` automatically assembles a ready-to-deploy directory:
+
+| Build | Output directory | Contents |
+|-------|-----------------|----------|
+| `far3` (default) | `target/release/far3/` | `far1c.dll`, `far1c_en.lng`, `far1c_ru.lng` |
+| `far2` | `target/release/far2/` | `far1c.far-plug-wide`, `far1c_en.lng`, `far1c_ru.lng`, `copy_to_far2l.sh` |
+
+> **Note:** `build.rs` prepares the `.lng` files and helper script. The CI workflow (or the manual step below) copies the compiled library into the same directory with the correct name.
 
 ### Windows (FAR Manager 3)
 
-1. Build the plugin (see above)
-2. Create plugin directory: `%FARHOME%\Plugins\far1c\`
-3. Copy `target\release\far1c.dll` to the plugin directory
-4. Copy language files `far1c_en.lng` and `far1c_ru.lng` to the same directory
-5. Restart FAR Manager
-6. The plugin will appear in the `F11` menu
+1. Build the plugin: `cargo build --release`
+2. Copy `target\release\far1c.dll` into `target\release\far3\` (CI does this automatically)
+3. Copy the entire `target\release\far3\` directory to `%FARHOME%\Plugins\far1c\`
+4. Restart FAR Manager — the plugin will appear in the `F11` menu
 
 ### Linux (far2l)
 
-The easiest way to install on Linux is using the provided installation script, which builds the plugin and copies it to the system FHS directories.
-
-1. Make the script executable and run it:
+1. Build the plugin:
    ```bash
-   chmod +x install_linux.sh
-   ./install_linux.sh
+   cargo build --release --no-default-features --features far2
    ```
-2. Restart far2l
+2. Copy the compiled library into the dist directory:
+   ```bash
+   cp target/release/libfar1c.so target/release/far2/far1c.far-plug-wide
+   ```
+3. Run the helper script to install into the system FHS paths:
+   ```bash
+   chmod +x dist/copy_to_far2l.sh
+   dist/copy_to_far2l.sh
+   ```
+4. Restart far2l
 
 > **Note:** The script uses `sudo` to install the plugin binary to `/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide` and language files to `/usr/share/far2l/Plugins/far1c/plug/` in accordance with the far2l FHS standard.
 
