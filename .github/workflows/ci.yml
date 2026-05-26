@@ -34,11 +34,8 @@ jobs:
     - name: Run tests
       run: cargo test
       
-    - name: Build release
-      run: cargo build --release
-
-    - name: Assemble dist (far3)
-      run: Copy-Item target\release\far1c.dll target\release\far3\far1c.dll
+    - name: Build and package release
+      run: .\build_release.ps1
       
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -70,11 +67,8 @@ jobs:
     - name: Run tests
       run: cargo test --no-default-features --features far2
       
-    - name: Build release
-      run: cargo build --no-default-features --features far2 --release
-
-    - name: Assemble dist (far2)
-      run: cp target/release/libfar1c.so target/release/far2/far1c.far-plug-wide
+    - name: Build and package release
+      run: bash ./build_release.sh
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

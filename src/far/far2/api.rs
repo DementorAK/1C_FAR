@@ -393,6 +393,7 @@ pub const REG_DWORD: u32 = 4;
 pub const ERROR_SUCCESS: LSTATUS = 0;
 
 extern "C" {
+    #[link_name = "WINPORT_RegCreateKeyExW"]
     pub fn RegCreateKeyExW(
         hKey: HKEY,
         lpSubKey: *const u32,
@@ -405,6 +406,7 @@ extern "C" {
         lpdwDisposition: *mut u32,
     ) -> LSTATUS;
 
+    #[link_name = "WINPORT_RegSetValueExW"]
     pub fn RegSetValueExW(
         hKey: HKEY,
         lpValueName: *const u32,
@@ -414,6 +416,7 @@ extern "C" {
         cbData: u32,
     ) -> LSTATUS;
 
+    #[link_name = "WINPORT_RegQueryValueExW"]
     pub fn RegQueryValueExW(
         hKey: HKEY,
         lpValueName: *const u32,
@@ -423,5 +426,6 @@ extern "C" {
         lpcbData: *mut u32,
     ) -> LSTATUS;
 
+    #[link_name = "WINPORT_RegCloseKey"]
     pub fn RegCloseKey(hKey: HKEY) -> LSTATUS;
 }
