@@ -146,11 +146,32 @@ pub type FARSTANDARDFUNCTIONS = *mut c_void;
 pub type FARAPISHOWHELP = *mut c_void;
 pub type FARAPIADVCONTROL = *mut c_void;
 pub type FARAPIINPUTBOX = *mut c_void;
-pub type FARAPIDIALOGINIT = *mut c_void;
-pub type FARAPIDIALOGRUN = *mut c_void;
-pub type FARAPIDIALOGFREE = *mut c_void;
-pub type FARAPISENDDLGMESSAGE = *mut c_void;
-pub type FARAPIDEFDLGPROC = *mut c_void;
+pub type FARAPIDIALOGINIT = Option<
+    unsafe extern "system" fn(
+        PluginNumber: IntPtr,
+        X1: i32,
+        Y1: i32,
+        X2: i32,
+        Y2: i32,
+        HelpTopic: *const WCHAR,
+        Item: *mut FarDialogItem,
+        ItemsNumber: u32,
+        Reserved: DWORD,
+        Flags: DWORD,
+        DlgProc: FARWINDOWPROC,
+        Param: IntPtr,
+    ) -> HANDLE,
+>;
+pub type FARAPIDIALOGRUN =
+    Option<unsafe extern "system" fn(hDlg: HANDLE) -> i32>;
+pub type FARAPIDIALOGFREE =
+    Option<unsafe extern "system" fn(hDlg: HANDLE)>;
+pub type FARAPISENDDLGMESSAGE = Option<
+    unsafe extern "system" fn(hDlg: HANDLE, Msg: i32, Param1: i32, Param2: IntPtr) -> IntPtr,
+>;
+pub type FARAPIDEFDLGPROC = Option<
+    unsafe extern "system" fn(hDlg: HANDLE, Msg: i32, Param1: i32, Param2: IntPtr) -> IntPtr,
+>;
 pub type FARAPIVIEWERCONTROL = *mut c_void;
 pub type FARAPIPLUGINSCONTROL = *mut c_void;
 pub type FARAPIFILEFILTERCONTROL = *mut c_void;
@@ -383,6 +404,114 @@ pub unsafe fn from_wide_ptr(ptr: *const WCHAR) -> String {
     crate::far::string_utils::from_wide_ptr(ptr)
 }
 
+// --- Dialog API types (FAR 2) ---
+
+#[repr(C, packed(2))]
+#[derive(Clone, Copy)]
+pub struct FarListItem {
+    pub Flags: DWORD,
+    pub Text: *const WCHAR,
+    pub Reserved: [DWORD; 3],
+}
+
+#[repr(C, packed(2))]
+#[derive(Clone, Copy)]
+pub struct FarList {
+    pub ItemsNumber: i32,
+    pub Items: *mut FarListItem,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union FarDialogItemParam {
+    pub Reserved: DWORD,
+    pub Selected: i32,
+    pub History: *const WCHAR,
+    pub Mask: *const WCHAR,
+    pub ListItems: *mut FarList,
+    pub ListPos: i32,
+    pub VBuf: *mut c_void,
+}
+
+impl Default for FarDialogItemParam {
+    fn default() -> Self {
+        FarDialogItemParam { Reserved: 0 }
+    }
+}
+
+#[repr(C, packed(2))]
+#[derive(Clone, Copy)]
+pub struct FarDialogItem {
+    pub Type: i32,
+    pub X1: i32,
+    pub Y1: i32,
+    pub X2: i32,
+    pub Y2: i32,
+    pub Focus: i32,
+    pub Param: FarDialogItemParam,
+    pub Flags: DWORD,
+    pub DefaultButton: i32,
+    pub PtrData: *const WCHAR,
+    pub MaxLen: usize,
+}
+
+impl Default for FarDialogItem {
+    fn default() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+}
+
+pub const DI_TEXT: i32 = 0;
+pub const DI_VTEXT: i32 = 1;
+pub const DI_SINGLEBOX: i32 = 2;
+pub const DI_DOUBLEBOX: i32 = 3;
+pub const DI_EDIT: i32 = 4;
+pub const DI_PSWEDIT: i32 = 5;
+pub const DI_FIXEDIT: i32 = 6;
+pub const DI_BUTTON: i32 = 7;
+pub const DI_CHECKBOX: i32 = 8;
+pub const DI_RADIOBUTTON: i32 = 9;
+pub const DI_COMBOBOX: i32 = 10;
+pub const DI_LISTBOX: i32 = 11;
+pub const DI_USERCONTROL: i32 = 255;
+
+pub const DIF_NONE: DWORD = 0;
+pub const DIF_GROUP: DWORD = 0x00000400;
+pub const DIF_LEFTTEXT: DWORD = 0x00000800;
+pub const DIF_MOVESELECT: DWORD = 0x00001000;
+pub const DIF_SHOWAMPERSAND: DWORD = 0x00002000;
+pub const DIF_CENTERGROUP: DWORD = 0x00004000;
+pub const DIF_NOBRACKETS: DWORD = 0x00008000;
+pub const DIF_SEPARATOR: DWORD = 0x00010000;
+pub const DIF_SEPARATOR2: DWORD = 0x00020000;
+pub const DIF_BTNNOCLOSE: DWORD = 0x00040000;
+pub const DIF_CENTERTEXT: DWORD = 0x00040000;
+pub const DIF_NOFOCUS: DWORD = 0x40000000;
+pub const DIF_DISABLE: DWORD = 0x80000000;
+
+pub const DM_FIRST: i32 = 0;
+pub const DM_CLOSE: i32 = 1;
+pub const DM_GETDLGDATA: i32 = 4;
+pub const DM_GETTEXT: i32 = 7;
+pub const DM_KEY: i32 = 9;
+pub const DM_REDRAW: i32 = 14;
+pub const DM_GETFOCUS: i32 = 18;
+pub const DM_GETTEXTPTR: i32 = 21;
+pub const DM_SETTEXTPTR: i32 = 22;
+pub const DM_GETCHECK: i32 = 25;
+pub const DM_SETCHECK: i32 = 26;
+
+pub const FDLG_WARNING: DWORD = 0x00000001;
+pub const FDLG_SMALLDIALOG: DWORD = 0x00000002;
+pub const FDLG_NODRAWSHADOW: DWORD = 0x00000004;
+pub const FDLG_NODRAWPANEL: DWORD = 0x00000008;
+pub const FDLG_KEEPCONSOLETITLE: DWORD = 0x00000020;
+pub const FDLG_REGULARIDLE: DWORD = 0x00000040;
+
+pub type FARWINDOWPROC = Option<
+    unsafe extern "system" fn(hDlg: HANDLE, Msg: i32, Param1: i32, Param2: IntPtr) -> IntPtr,
+>;
+
 // --- Windows Registry FFI (WinPort) ---
 pub type HKEY = *mut c_void;
 pub type LSTATUS = i32;
@@ -428,4 +557,26 @@ extern "C" {
 
     #[link_name = "WINPORT_RegCloseKey"]
     pub fn RegCloseKey(hKey: HKEY) -> LSTATUS;
+
+    #[link_name = "WINPORT_GetPrivateProfileIntW"]
+    pub fn GetPrivateProfileIntW(
+        lpAppName: *const WCHAR,
+        lpKeyName: *const WCHAR,
+        nDefault: i32,
+        lpFileName: *const WCHAR,
+    ) -> u32;
+
+    #[link_name = "WINPORT_WritePrivateProfileStringW"]
+    pub fn WritePrivateProfileStringW(
+        lpAppName: *const WCHAR,
+        lpKeyName: *const WCHAR,
+        lpString: *const WCHAR,
+        lpFileName: *const WCHAR,
+    ) -> BOOL;
+
+    #[link_name = "WINPORT_CreateDirectoryW"]
+    pub fn CreateDirectoryW(
+        lpPathName: *const WCHAR,
+        lpSecurityAttributes: *mut c_void,
+    ) -> BOOL;
 }

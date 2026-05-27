@@ -28,6 +28,59 @@ pub unsafe extern "C" fn SetStartupInfoW(info: *const PluginStartupInfo) {
             crate::far::STARTUP_INFO = Some(*info);
             #[cfg(not(target_os = "windows"))]
             let _ = simple_logger::init();
+
+            // Compute path to config.ini for settings persistence
+            let psi = &*info;
+            if !psi.ModuleName.is_null() {
+                let module_name = crate::far::string_utils::from_wide_ptr(psi.ModuleName);
+                let is_far2m = module_name.to_lowercase().contains("far2m");
+
+                let ini_path = if is_far2m {
+                    // far2m: save config.ini in plugin directory
+                    let parent = std::path::Path::new(&module_name)
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| ".".to_string());
+                    std::path::Path::new(&parent).join("config.ini").to_string_lossy().to_string()
+                } else {
+                    // far2l: save config.ini in ~/.config/far2l/plugins/<PluginName>/
+                    let plugin_name = if !psi.RootKey.is_null() {
+                        let root_key = crate::far::string_utils::from_wide_ptr(psi.RootKey);
+                        root_key.rsplit('\\').next()
+                            .or_else(|| root_key.rsplit('/').next())
+                            .unwrap_or("1C_FAR")
+                            .to_string()
+                    } else {
+                        "1C_FAR".to_string()
+                    };
+
+                    let xdg_config = std::env::var("XDG_CONFIG_HOME")
+                        .unwrap_or_else(|_| {
+                            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+                            format!("{}/.config", home)
+                        });
+
+                    let plugin_config_dir = std::path::Path::new(&xdg_config)
+                        .join("far2l")
+                        .join("plugins")
+                        .join(&plugin_name);
+
+                    let dir_wide = crate::far::string_utils::to_wide(
+                        &plugin_config_dir.to_string_lossy()
+                    );
+                    // Create directory if it doesn't exist
+                    CreateDirectoryW(dir_wide.as_ptr(), std::ptr::null_mut());
+
+                    plugin_config_dir.join("config.ini").to_string_lossy().to_string()
+                };
+
+                let ini_wide = crate::far::string_utils::to_wide(&ini_path);
+                info!("Settings ini path: {}", ini_path);
+                if let Ok(mut guard) = crate::far::INI_FILE_PATH.lock() {
+                    *guard = Some(ini_wide);
+                }
+            }
+
             info!("1C:Enterprise Artifacts plugin loaded (far2)");
         }
     });

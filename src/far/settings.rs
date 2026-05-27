@@ -172,124 +172,98 @@ impl PluginSettings {
     pub fn load() -> Self {
         use log::info;
         let mut settings = Self::default();
-        unsafe {
-            let psi = match crate::far::STARTUP_INFO {
-                Some(psi) => psi,
-                None => {
-                    info!("Settings::load (far2): STARTUP_INFO is None, using defaults");
-                    return settings;
-                }
-            };
 
-            let mut h_key: crate::far::api::HKEY = std::ptr::null_mut();
-            if crate::far::api::RegCreateKeyExW(
-                crate::far::api::HKEY_CURRENT_USER,
-                psi.RootKey,
-                0,
-                std::ptr::null(),
-                0,
-                crate::far::api::KEY_ALL_ACCESS,
-                std::ptr::null_mut(),
-                &mut h_key,
-                std::ptr::null_mut(),
-            ) == crate::far::api::ERROR_SUCCESS {
-                let mut data: u32 = 0;
-                let mut size: u32 = 4;
-                let mut typ: u32 = 0;
-                
-                let name_backup = crate::far::string_utils::to_wide("CreateBackup");
-                if crate::far::api::RegQueryValueExW(
-                    h_key,
-                    name_backup.as_ptr(),
-                    std::ptr::null_mut(),
-                    &mut typ,
-                    &mut data as *mut u32 as *mut u8,
-                    &mut size,
-                ) == crate::far::api::ERROR_SUCCESS {
-                    settings.create_backup = data != 0;
-                    info!("Settings::load (far2): CreateBackup = {}", settings.create_backup);
-                }
-                
-                let name_style = crate::far::string_utils::to_wide("UnpackStyle");
-                size = 4;
-                if crate::far::api::RegQueryValueExW(
-                    h_key,
-                    name_style.as_ptr(),
-                    std::ptr::null_mut(),
-                    &mut typ,
-                    &mut data as *mut u32 as *mut u8,
-                    &mut size,
-                ) == crate::far::api::ERROR_SUCCESS {
-                    settings.unpack_style = match data {
-                        0 => UnpackStyle::Raw,
-                        1 => UnpackStyle::FullParse,
-                        2 => UnpackStyle::V8Unpack,
-                        3 => UnpackStyle::Saby,
-                        _ => UnpackStyle::default(),
-                    };
-                    info!("Settings::load (far2): UnpackStyle = {:?}", settings.unpack_style);
-                }
-                
-                crate::far::api::RegCloseKey(h_key);
-            } else {
-                info!("Settings::load (far2): RegCreateKeyExW failed, using defaults");
+        let ini_path = match crate::far::INI_FILE_PATH.lock() {
+            Ok(guard) => guard.clone(),
+            Err(_) => {
+                info!("Settings::load (far2): INI_FILE_PATH lock poisoned, using defaults");
+                return settings;
             }
+        };
+        let ini_path = match ini_path {
+            Some(p) => p,
+            None => {
+                info!("Settings::load (far2): INI_FILE_PATH not set, using defaults");
+                return settings;
+            }
+        };
+
+        unsafe {
+            let section = crate::far::string_utils::to_wide("MainSettings");
+            let key_backup = crate::far::string_utils::to_wide("CreateBackup");
+            let key_style = crate::far::string_utils::to_wide("UnpackStyle");
+
+            let cb_raw = crate::far::api::GetPrivateProfileIntW(
+                section.as_ptr(),
+                key_backup.as_ptr(),
+                1, // default: true
+                ini_path.as_ptr(),
+            );
+            settings.create_backup = cb_raw != 0;
+            info!("Settings::load (far2): CreateBackup = {}", settings.create_backup);
+
+            let style_raw = crate::far::api::GetPrivateProfileIntW(
+                section.as_ptr(),
+                key_style.as_ptr(),
+                1, // default: FullParse
+                ini_path.as_ptr(),
+            );
+            settings.unpack_style = match style_raw {
+                0 => UnpackStyle::Raw,
+                1 => UnpackStyle::FullParse,
+                2 => UnpackStyle::V8Unpack,
+                3 => UnpackStyle::Saby,
+                _ => UnpackStyle::default(),
+            };
+            info!("Settings::load (far2): UnpackStyle = {:?} (raw={})", settings.unpack_style, style_raw);
         }
+
         settings
     }
 
     #[cfg(feature = "far2")]
     pub fn save(&self) {
         use log::info;
-        unsafe {
-            let psi = match crate::far::STARTUP_INFO {
-                Some(psi) => psi,
-                None => {
-                    info!("Settings::save (far2): STARTUP_INFO is None, cannot save");
-                    return;
-                }
-            };
 
-            let mut h_key: crate::far::api::HKEY = std::ptr::null_mut();
-            if crate::far::api::RegCreateKeyExW(
-                crate::far::api::HKEY_CURRENT_USER,
-                psi.RootKey,
-                0,
-                std::ptr::null(),
-                0,
-                crate::far::api::KEY_ALL_ACCESS,
-                std::ptr::null_mut(),
-                &mut h_key,
-                std::ptr::null_mut(),
-            ) == crate::far::api::ERROR_SUCCESS {
-                let name_backup = crate::far::string_utils::to_wide("CreateBackup");
-                let data_backup: u32 = if self.create_backup { 1 } else { 0 };
-                crate::far::api::RegSetValueExW(
-                    h_key,
-                    name_backup.as_ptr(),
-                    0,
-                    crate::far::api::REG_DWORD,
-                    &data_backup as *const u32 as *const u8,
-                    4,
-                );
-                
-                let name_style = crate::far::string_utils::to_wide("UnpackStyle");
-                let data_style: u32 = self.unpack_style as u32;
-                crate::far::api::RegSetValueExW(
-                    h_key,
-                    name_style.as_ptr(),
-                    0,
-                    crate::far::api::REG_DWORD,
-                    &data_style as *const u32 as *const u8,
-                    4,
-                );
-                
-                crate::far::api::RegCloseKey(h_key);
-                info!("Settings::save (far2): saved CreateBackup={}, UnpackStyle={:?}", 
-                      self.create_backup, self.unpack_style);
-            } else {
-                info!("Settings::save (far2): RegCreateKeyExW failed, cannot save");
+        let ini_path = match crate::far::INI_FILE_PATH.lock() {
+            Ok(guard) => guard.clone(),
+            Err(_) => {
+                info!("Settings::save (far2): INI_FILE_PATH lock poisoned, cannot save");
+                return;
             }
+        };
+        let ini_path = match ini_path {
+            Some(p) => p,
+            None => {
+                info!("Settings::save (far2): INI_FILE_PATH not set, cannot save");
+                return;
+            }
+        };
+
+        unsafe {
+            let section = crate::far::string_utils::to_wide("MainSettings");
+            let key_backup = crate::far::string_utils::to_wide("CreateBackup");
+            let key_style = crate::far::string_utils::to_wide("UnpackStyle");
+
+            let val_backup = crate::far::string_utils::to_wide(if self.create_backup { "1" } else { "0" });
+            crate::far::api::WritePrivateProfileStringW(
+                section.as_ptr(),
+                key_backup.as_ptr(),
+                val_backup.as_ptr(),
+                ini_path.as_ptr(),
+            );
+
+            let val_style_str = format!("{}", self.unpack_style as u32);
+            let val_style = crate::far::string_utils::to_wide(&val_style_str);
+            crate::far::api::WritePrivateProfileStringW(
+                section.as_ptr(),
+                key_style.as_ptr(),
+                val_style.as_ptr(),
+                ini_path.as_ptr(),
+            );
+
+            info!("Settings::save (far2): saved CreateBackup={}, UnpackStyle={:?}",
+                  self.create_backup, self.unpack_style);
         }
     }
 }

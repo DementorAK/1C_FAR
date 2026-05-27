@@ -309,7 +309,190 @@ pub fn finish_progress() {
 }
 
 #[cfg(feature = "far2")]
-pub fn show_settings_dialog(_settings: &PluginSettings) -> Option<PluginSettings> {
-    // TODO: implement FAR2 settings dialog
-    None
+pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings> {
+    use crate::far::api::*;
+    use crate::far::lang::{get_msg, Msg};
+    use crate::far::settings::UnpackStyle;
+    use crate::far::STARTUP_INFO;
+    use std::ptr;
+
+    unsafe {
+        let psi = STARTUP_INFO?;
+        let di = psi.DialogInit?;
+        let dr = psi.DialogRun?;
+        let df = psi.DialogFree?;
+        let sc = psi.SendDlgMessage?;
+
+        let title = crate::far::string_utils::to_wide(&get_msg(Msg::SettingsTitle));
+        let backup_text = crate::far::string_utils::to_wide(&get_msg(Msg::BackupCheckbox));
+        let style_label = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleLabel));
+        let style_raw = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleRaw));
+        let style_full = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleFull));
+        let style_v8 = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleV8));
+        let style_saby = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleSaby));
+        let ok_text = crate::far::string_utils::to_wide(&get_msg(Msg::Ok));
+        let cancel_text = crate::far::string_utils::to_wide(&get_msg(Msg::Cancel));
+
+        let mut items = vec![
+            FarDialogItem {
+                Type: DI_DOUBLEBOX,
+                X1: 3, Y1: 1, X2: 60, Y2: 13,
+                Focus: 0,
+                Param: FarDialogItemParam { Selected: 0 },
+                Flags: 0,
+                DefaultButton: 0,
+                PtrData: title.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_CHECKBOX,
+                X1: 5, Y1: 2, X2: 0, Y2: 0,
+                Focus: 1,
+                Param: FarDialogItemParam { Selected: if settings.create_backup { 1 } else { 0 } },
+                Flags: 0,
+                DefaultButton: 0,
+                PtrData: backup_text.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_TEXT,
+                X1: 5, Y1: 3, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam { Selected: 0 },
+                Flags: DIF_SEPARATOR,
+                DefaultButton: 0,
+                PtrData: ptr::null(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_TEXT,
+                X1: 5, Y1: 4, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam { Selected: 0 },
+                Flags: 0,
+                DefaultButton: 0,
+                PtrData: style_label.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_RADIOBUTTON,
+                X1: 7, Y1: 5, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::Raw { 1 } else { 0 },
+                },
+                Flags: DIF_GROUP,
+                DefaultButton: 0,
+                PtrData: style_raw.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_RADIOBUTTON,
+                X1: 7, Y1: 6, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::FullParse { 1 } else { 0 },
+                },
+                Flags: 0,
+                DefaultButton: 0,
+                PtrData: style_full.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_RADIOBUTTON,
+                X1: 7, Y1: 7, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::V8Unpack { 1 } else { 0 },
+                },
+                Flags: 0,
+                DefaultButton: 0,
+                PtrData: style_v8.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_RADIOBUTTON,
+                X1: 7, Y1: 8, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::Saby { 1 } else { 0 },
+                },
+                Flags: 0,
+                DefaultButton: 0,
+                PtrData: style_saby.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_TEXT,
+                X1: 5, Y1: 10, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam { Selected: 0 },
+                Flags: DIF_SEPARATOR,
+                DefaultButton: 0,
+                PtrData: ptr::null(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_BUTTON,
+                X1: 0, Y1: 11, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam { Selected: 0 },
+                Flags: DIF_CENTERGROUP,
+                DefaultButton: 1,
+                PtrData: ok_text.as_ptr(),
+                MaxLen: 0,
+            },
+            FarDialogItem {
+                Type: DI_BUTTON,
+                X1: 0, Y1: 11, X2: 0, Y2: 0,
+                Focus: 0,
+                Param: FarDialogItemParam { Selected: 0 },
+                Flags: DIF_CENTERGROUP,
+                DefaultButton: 0,
+                PtrData: cancel_text.as_ptr(),
+                MaxLen: 0,
+            },
+        ];
+
+        let h_dlg = di(
+            psi.ModuleNumber,
+            -1, -1,
+            64, 15,
+            ptr::null(),
+            items.as_mut_ptr(),
+            items.len() as u32,
+            0,
+            0,
+            None,
+            0,
+        );
+
+        if h_dlg.is_null() {
+            return None;
+        }
+
+        let ret = dr(h_dlg);
+        if ret == 9 {
+            let mut new_settings = PluginSettings {
+                create_backup: sc(h_dlg, DM_GETCHECK, 1, 0) != 0,
+                ..Default::default()
+            };
+
+            if sc(h_dlg, DM_GETCHECK, 4, 0) != 0 {
+                new_settings.unpack_style = UnpackStyle::Raw;
+            } else if sc(h_dlg, DM_GETCHECK, 5, 0) != 0 {
+                new_settings.unpack_style = UnpackStyle::FullParse;
+            } else if sc(h_dlg, DM_GETCHECK, 6, 0) != 0 {
+                new_settings.unpack_style = UnpackStyle::V8Unpack;
+            } else if sc(h_dlg, DM_GETCHECK, 7, 0) != 0 {
+                new_settings.unpack_style = UnpackStyle::Saby;
+            }
+
+            df(h_dlg);
+            Some(new_settings)
+        } else {
+            df(h_dlg);
+            None
+        }
+    }
 }
