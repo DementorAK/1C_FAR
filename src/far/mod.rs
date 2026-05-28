@@ -23,7 +23,7 @@ pub mod ui;
 pub static mut STARTUP_INFO: Option<api::PluginStartupInfo> = None;
 
 #[cfg(feature = "far2")]
-pub static INI_FILE_PATH: std::sync::Mutex<Option<Vec<u32>>> = std::sync::Mutex::new(None);
+pub static INI_FILE_PATH: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 pub const PLUGIN_GUID: api::GUID = api::GUID {
     Data1: 0x1c1c1c1c,

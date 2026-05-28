@@ -188,34 +188,46 @@ impl PluginSettings {
             }
         };
 
-        unsafe {
-            let section = crate::far::string_utils::to_wide("MainSettings");
-            let key_backup = crate::far::string_utils::to_wide("CreateBackup");
-            let key_style = crate::far::string_utils::to_wide("UnpackStyle");
+        let content = match std::fs::read_to_string(&ini_path) {
+            Ok(c) => c,
+            Err(e) => {
+                info!("Settings::load (far2): cannot read {}: {}, using defaults", ini_path, e);
+                return settings;
+            }
+        };
 
-            let cb_raw = crate::far::api::GetPrivateProfileIntW(
-                section.as_ptr(),
-                key_backup.as_ptr(),
-                1, // default: true
-                ini_path.as_ptr(),
-            );
-            settings.create_backup = cb_raw != 0;
-            info!("Settings::load (far2): CreateBackup = {}", settings.create_backup);
-
-            let style_raw = crate::far::api::GetPrivateProfileIntW(
-                section.as_ptr(),
-                key_style.as_ptr(),
-                1, // default: FullParse
-                ini_path.as_ptr(),
-            );
-            settings.unpack_style = match style_raw {
-                0 => UnpackStyle::Raw,
-                1 => UnpackStyle::FullParse,
-                2 => UnpackStyle::V8Unpack,
-                3 => UnpackStyle::Saby,
-                _ => UnpackStyle::default(),
-            };
-            info!("Settings::load (far2): UnpackStyle = {:?} (raw={})", settings.unpack_style, style_raw);
+        let mut in_section = false;
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('[') {
+                in_section = line.eq_ignore_ascii_case("[mainsettings]");
+                continue;
+            }
+            if !in_section {
+                continue;
+            }
+            if let Some((key, value)) = line.split_once('=') {
+                let key = key.trim();
+                let value = value.trim();
+                match key {
+                    "CreateBackup" => {
+                        settings.create_backup = value != "0";
+                        info!("Settings::load (far2): CreateBackup = {}", settings.create_backup);
+                    }
+                    "UnpackStyle" => {
+                        let raw: u32 = value.parse().unwrap_or(1);
+                        settings.unpack_style = match raw {
+                            0 => UnpackStyle::Raw,
+                            1 => UnpackStyle::FullParse,
+                            2 => UnpackStyle::V8Unpack,
+                            3 => UnpackStyle::Saby,
+                            _ => UnpackStyle::default(),
+                        };
+                        info!("Settings::load (far2): UnpackStyle = {:?} (raw={})", settings.unpack_style, raw);
+                    }
+                    _ => {}
+                }
+            }
         }
 
         settings
@@ -240,28 +252,15 @@ impl PluginSettings {
             }
         };
 
-        unsafe {
-            let section = crate::far::string_utils::to_wide("MainSettings");
-            let key_backup = crate::far::string_utils::to_wide("CreateBackup");
-            let key_style = crate::far::string_utils::to_wide("UnpackStyle");
+        let content = format!(
+            "[MainSettings]\nCreateBackup={}\nUnpackStyle={}\n",
+            if self.create_backup { 1 } else { 0 },
+            self.unpack_style as u32
+        );
 
-            let val_backup = crate::far::string_utils::to_wide(if self.create_backup { "1" } else { "0" });
-            crate::far::api::WritePrivateProfileStringW(
-                section.as_ptr(),
-                key_backup.as_ptr(),
-                val_backup.as_ptr(),
-                ini_path.as_ptr(),
-            );
-
-            let val_style_str = format!("{}", self.unpack_style as u32);
-            let val_style = crate::far::string_utils::to_wide(&val_style_str);
-            crate::far::api::WritePrivateProfileStringW(
-                section.as_ptr(),
-                key_style.as_ptr(),
-                val_style.as_ptr(),
-                ini_path.as_ptr(),
-            );
-
+        if let Err(e) = std::fs::write(&ini_path, &content) {
+            info!("Settings::save (far2): failed to write {}: {}", ini_path, e);
+        } else {
             info!("Settings::save (far2): saved CreateBackup={}, UnpackStyle={:?}",
                   self.create_backup, self.unpack_style);
         }

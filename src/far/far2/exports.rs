@@ -65,19 +65,15 @@ pub unsafe extern "C" fn SetStartupInfoW(info: *const PluginStartupInfo) {
                         .join("plugins")
                         .join(&plugin_name);
 
-                    let dir_wide = crate::far::string_utils::to_wide(
-                        &plugin_config_dir.to_string_lossy()
-                    );
-                    // Create directory if it doesn't exist
-                    CreateDirectoryW(dir_wide.as_ptr(), std::ptr::null_mut());
+                    // Create directory if it doesn't exist (pure Rust, no WinPort dependency)
+                    let _ = std::fs::create_dir_all(&plugin_config_dir);
 
                     plugin_config_dir.join("config.ini").to_string_lossy().to_string()
                 };
 
-                let ini_wide = crate::far::string_utils::to_wide(&ini_path);
                 info!("Settings ini path: {}", ini_path);
                 if let Ok(mut guard) = crate::far::INI_FILE_PATH.lock() {
-                    *guard = Some(ini_wide);
+                    *guard = Some(ini_path);
                 }
             }
 

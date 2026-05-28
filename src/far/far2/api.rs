@@ -522,7 +522,7 @@ pub const REG_DWORD: u32 = 4;
 pub const ERROR_SUCCESS: LSTATUS = 0;
 
 extern "C" {
-    #[link_name = "WINPORT_RegCreateKeyExW"]
+    #[link_name = "WINPORT_RegCreateKeyEx"]
     pub fn RegCreateKeyExW(
         hKey: HKEY,
         lpSubKey: *const u32,
@@ -535,7 +535,7 @@ extern "C" {
         lpdwDisposition: *mut u32,
     ) -> LSTATUS;
 
-    #[link_name = "WINPORT_RegSetValueExW"]
+    #[link_name = "WINPORT_RegSetValueEx"]
     pub fn RegSetValueExW(
         hKey: HKEY,
         lpValueName: *const u32,
@@ -545,7 +545,7 @@ extern "C" {
         cbData: u32,
     ) -> LSTATUS;
 
-    #[link_name = "WINPORT_RegQueryValueExW"]
+    #[link_name = "WINPORT_RegQueryValueEx"]
     pub fn RegQueryValueExW(
         hKey: HKEY,
         lpValueName: *const u32,
@@ -558,25 +558,4 @@ extern "C" {
     #[link_name = "WINPORT_RegCloseKey"]
     pub fn RegCloseKey(hKey: HKEY) -> LSTATUS;
 
-    #[link_name = "WINPORT_GetPrivateProfileIntW"]
-    pub fn GetPrivateProfileIntW(
-        lpAppName: *const WCHAR,
-        lpKeyName: *const WCHAR,
-        nDefault: i32,
-        lpFileName: *const WCHAR,
-    ) -> u32;
-
-    #[link_name = "WINPORT_WritePrivateProfileStringW"]
-    pub fn WritePrivateProfileStringW(
-        lpAppName: *const WCHAR,
-        lpKeyName: *const WCHAR,
-        lpString: *const WCHAR,
-        lpFileName: *const WCHAR,
-    ) -> BOOL;
-
-    #[link_name = "WINPORT_CreateDirectoryW"]
-    pub fn CreateDirectoryW(
-        lpPathName: *const WCHAR,
-        lpSecurityAttributes: *mut c_void,
-    ) -> BOOL;
 }

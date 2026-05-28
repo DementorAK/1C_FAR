@@ -8,6 +8,6 @@ if (!(Test-Path $TargetDir)) {
 }
 
 Copy-Item "target\release\far1c.dll" -Destination "$TargetDir\far1c.dll" -Force
-Copy-Item "dist\*" -Destination "$TargetDir\" -Force
+Copy-Item "dist\*.lng" -Destination "$TargetDir\" -Force
 
 Write-Host "Build complete in $TargetDir"
