@@ -40,7 +40,7 @@ pub fn get_msg(id: Msg) -> String {
     unsafe {
         if let Some(psi) = STARTUP_INFO {
             if let Some(gm) = psi.GetMsg {
-                let ptr = gm(psi.ModuleNumber, id as IntPtr);
+                let ptr = gm(psi.ModuleNumber, id as i32);
                 if !ptr.is_null() {
                     return crate::far::string_utils::from_wide_ptr(ptr);
                 }

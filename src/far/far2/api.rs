@@ -103,7 +103,7 @@ pub type FARAPIMESSAGE = Option<
     ) -> IntPtr,
 >;
 pub type FARAPIGETMSG =
-    Option<unsafe extern "system" fn(PluginNumber: IntPtr, MsgId: IntPtr) -> *const WCHAR>;
+    Option<unsafe extern "system" fn(PluginNumber: IntPtr, MsgId: i32) -> *const WCHAR>;
 pub type FARAPICONTROL = Option<
     unsafe extern "system" fn(hPlugin: HANDLE, Command: i32, Param1: i32, Param2: IntPtr) -> i32,
 >;
@@ -421,10 +421,10 @@ pub struct FarList {
     pub Items: *mut FarListItem,
 }
 
-#[repr(C)]
+#[repr(C, packed(2))]
 #[derive(Clone, Copy)]
 pub union FarDialogItemParam {
-    pub Reserved: DWORD,
+    pub Reserved: IntPtr,
     pub Selected: i32,
     pub History: *const WCHAR,
     pub Mask: *const WCHAR,
@@ -451,7 +451,8 @@ pub struct FarDialogItem {
     pub Param: FarDialogItemParam,
     pub Flags: DWORD,
     pub DefaultButton: i32,
-    pub Data: [WCHAR; 512],
+    pub PtrData: *const WCHAR,
+    pub MaxLen: usize,
 }
 
 impl Default for FarDialogItem {
