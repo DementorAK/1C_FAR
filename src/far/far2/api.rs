@@ -451,8 +451,7 @@ pub struct FarDialogItem {
     pub Param: FarDialogItemParam,
     pub Flags: DWORD,
     pub DefaultButton: i32,
-    pub PtrData: *const WCHAR,
-    pub MaxLen: usize,
+    pub Data: [WCHAR; 512],
 }
 
 impl Default for FarDialogItem {

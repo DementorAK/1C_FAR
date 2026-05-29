@@ -309,6 +309,34 @@ pub fn finish_progress() {
 }
 
 #[cfg(feature = "far2")]
+fn make_dialog_item(
+    item_type: i32,
+    x1: i32, y1: i32, x2: i32, y2: i32,
+    focus: i32,
+    selected: i32,
+    flags: u32,
+    default_button: i32,
+    text: &[u32],
+) -> crate::far::api::FarDialogItem {
+    let mut data = [0; 512];
+    if !text.is_empty() {
+        let len = text.len().min(511);
+        data[..len].copy_from_slice(&text[..len]);
+        data[len] = 0;
+    }
+
+    crate::far::api::FarDialogItem {
+        Type: item_type,
+        X1: x1, Y1: y1, X2: x2, Y2: y2,
+        Focus: focus,
+        Param: crate::far::api::FarDialogItemParam { Selected: selected },
+        Flags: flags,
+        DefaultButton: default_button,
+        Data: data,
+    }
+}
+
+#[cfg(feature = "far2")]
 pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings> {
     use crate::far::api::*;
     use crate::far::lang::{get_msg, Msg};
@@ -334,124 +362,17 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
         let cancel_text = crate::far::string_utils::to_wide(&get_msg(Msg::Cancel));
 
         let mut items = vec![
-            FarDialogItem {
-                Type: DI_DOUBLEBOX,
-                X1: 3, Y1: 1, X2: 60, Y2: 13,
-                Focus: 0,
-                Param: FarDialogItemParam { Selected: 0 },
-                Flags: 0,
-                DefaultButton: 0,
-                PtrData: title.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_CHECKBOX,
-                X1: 5, Y1: 2, X2: 0, Y2: 0,
-                Focus: 1,
-                Param: FarDialogItemParam { Selected: if settings.create_backup { 1 } else { 0 } },
-                Flags: 0,
-                DefaultButton: 0,
-                PtrData: backup_text.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_TEXT,
-                X1: 5, Y1: 3, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam { Selected: 0 },
-                Flags: DIF_SEPARATOR,
-                DefaultButton: 0,
-                PtrData: ptr::null(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_TEXT,
-                X1: 5, Y1: 4, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam { Selected: 0 },
-                Flags: 0,
-                DefaultButton: 0,
-                PtrData: style_label.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 5, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam {
-                    Selected: if settings.unpack_style == UnpackStyle::Raw { 1 } else { 0 },
-                },
-                Flags: DIF_GROUP,
-                DefaultButton: 0,
-                PtrData: style_raw.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 6, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam {
-                    Selected: if settings.unpack_style == UnpackStyle::FullParse { 1 } else { 0 },
-                },
-                Flags: 0,
-                DefaultButton: 0,
-                PtrData: style_full.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 7, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam {
-                    Selected: if settings.unpack_style == UnpackStyle::V8Unpack { 1 } else { 0 },
-                },
-                Flags: 0,
-                DefaultButton: 0,
-                PtrData: style_v8.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_RADIOBUTTON,
-                X1: 7, Y1: 8, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam {
-                    Selected: if settings.unpack_style == UnpackStyle::Saby { 1 } else { 0 },
-                },
-                Flags: 0,
-                DefaultButton: 0,
-                PtrData: style_saby.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_TEXT,
-                X1: 5, Y1: 10, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam { Selected: 0 },
-                Flags: DIF_SEPARATOR,
-                DefaultButton: 0,
-                PtrData: ptr::null(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_BUTTON,
-                X1: 0, Y1: 11, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam { Selected: 0 },
-                Flags: DIF_CENTERGROUP,
-                DefaultButton: 1,
-                PtrData: ok_text.as_ptr(),
-                MaxLen: 0,
-            },
-            FarDialogItem {
-                Type: DI_BUTTON,
-                X1: 0, Y1: 11, X2: 0, Y2: 0,
-                Focus: 0,
-                Param: FarDialogItemParam { Selected: 0 },
-                Flags: DIF_CENTERGROUP,
-                DefaultButton: 0,
-                PtrData: cancel_text.as_ptr(),
-                MaxLen: 0,
-            },
+            make_dialog_item(DI_DOUBLEBOX, 3, 1, 60, 13, 0, 0, 0, 0, &title),
+            make_dialog_item(DI_CHECKBOX, 5, 2, 0, 0, 1, if settings.create_backup { 1 } else { 0 }, 0, 0, &backup_text),
+            make_dialog_item(DI_TEXT, 5, 3, 0, 0, 0, 0, DIF_SEPARATOR, 0, &[]),
+            make_dialog_item(DI_TEXT, 5, 4, 0, 0, 0, 0, 0, 0, &style_label),
+            make_dialog_item(DI_RADIOBUTTON, 7, 5, 0, 0, 0, if settings.unpack_style == UnpackStyle::Raw { 1 } else { 0 }, DIF_GROUP, 0, &style_raw),
+            make_dialog_item(DI_RADIOBUTTON, 7, 6, 0, 0, 0, if settings.unpack_style == UnpackStyle::FullParse { 1 } else { 0 }, 0, 0, &style_full),
+            make_dialog_item(DI_RADIOBUTTON, 7, 7, 0, 0, 0, if settings.unpack_style == UnpackStyle::V8Unpack { 1 } else { 0 }, 0, 0, &style_v8),
+            make_dialog_item(DI_RADIOBUTTON, 7, 8, 0, 0, 0, if settings.unpack_style == UnpackStyle::Saby { 1 } else { 0 }, 0, 0, &style_saby),
+            make_dialog_item(DI_TEXT, 5, 10, 0, 0, 0, 0, DIF_SEPARATOR, 0, &[]),
+            make_dialog_item(DI_BUTTON, 0, 11, 0, 0, 0, 0, DIF_CENTERGROUP, 1, &ok_text),
+            make_dialog_item(DI_BUTTON, 0, 11, 0, 0, 0, 0, DIF_CENTERGROUP, 0, &cancel_text),
         ];
 
         let h_dlg = di(
