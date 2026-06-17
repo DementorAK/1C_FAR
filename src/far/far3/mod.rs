@@ -5,3 +5,4 @@
 /// - `exports` — the `#[no_mangle]` exported functions FAR 3 calls into the plugin
 pub mod api;
 pub mod exports;
+pub mod ui;

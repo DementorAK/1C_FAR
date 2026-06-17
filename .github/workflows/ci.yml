@@ -34,14 +34,14 @@ jobs:
     - name: Run tests
       run: cargo test
       
-    - name: Build release
-      run: cargo build --release
+    - name: Build and package release
+      run: .\build_release.ps1
       
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: far1c-windows-x64
-        path: target/release/far1c.dll
+        path: target/release/far3/
         retention-days: 14
 
   build-linux-far2:
@@ -67,12 +67,12 @@ jobs:
     - name: Run tests
       run: cargo test --no-default-features --features far2
       
-    - name: Build release
-      run: cargo build --no-default-features --features far2 --release
-      
+    - name: Build and package release
+      run: bash ./build_release.sh
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: far1c-linux-x64
-        path: target/release/libfar1c.so
+        path: target/release/far2/
         retention-days: 14

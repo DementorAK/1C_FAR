@@ -2,6 +2,18 @@ pub mod base;
 pub mod far;
 pub mod v8;
 
+// ── Platform guard ────────────────────────────────────────────────────────────
+//
+// Feature `far2` targets far2l / far2m (Linux / macOS).
+// It relies on WinPort symbols (RegCreateKeyExW, etc.) that are only available
+// in the far2l runtime.  Building with `far2` on Windows is not supported.
+#[cfg(all(feature = "far2", target_os = "windows"))]
+compile_error!(
+    "Feature `far2` is not supported on Windows. \
+     Use `cargo build --features far2 --no-default-features --target x86_64-unknown-linux-gnu` \
+     for cross-compilation to Linux (far2l / far2m)."
+);
+
 // ── Conditional export of Far Plugin API entry points ─────────────────────────
 //
 // Exactly ONE feature must be active at build time:

@@ -1,0 +1,147 @@
+## Coding style
+See: [CODESTYLE.md](CODESTYLE.md)
+
+## Lyric
+I implemented/borrowed from WINE some commonly used WinAPI functions. They are all declared in WinPort/WinPort.h and corresponding defines can be found in WinPort/WinCompat.h (both are included by WinPort/windows.h). Note that this stuff may not be 1-to-1 to corresponding Win32 functionality also doesn't provide full-UNIX functionality, but it simplifies porting and can be considered as temporary scaffold.
+
+However, only the main executable is linked statically to WinPort, although it also _exports_ WinPort functionality, so plugins use it without the neccessity to bring their own copies of this code. This is the reason that each plugin's binary should not statically link to WinPort.
+
+While FAR internally is UTF16 (because WinPort contains UTF16-related stuff), native Linux wchar_t size is 4 bytes (rather than 2 bytes) so potentially Linux FAR may be fully UTF32-capable console interaction in the future, but while it uses Win32-style UTF16 functions it does not. However, programmers need to be aware that wchar_t is not 2 bytes long anymore.
+
+Inspect all printf format strings: unlike Windows, in Linux both wide and multibyte printf-like functions have the same multibyte and wide specifiers. This means that %s is always multibyte while %ls is always wide. So, any %s used in wide-printf-s or %ws used in any printf should be replaced with %ls.
+
+Update from 27aug: now it's possible by defining `WINPORT_DIRECT` to avoid renaming used Windows API and also to avoid changing format strings as swprintf will be intercepted by a compatibility wrapper.
+Update from 03/11/22: far2l's console emulator capable to correctly render full-width and combining characters as well as 24 bit colors. This caused following deviation of console-simulation functions behavior comparing to original Win32 API counterparts:
+
+* CHAR_INFO's Char::UnicodeChar field extended to 64 bit length to be able to associate sequence of multiple WCHARs with single cell.
+* Writing to console full-width character causes two cells to be used: first will get given character code in UnicodeChar field but next one will have UnicodeChar set to zero.
+* Writing combined characters - normal character followed by set of diactrical marks - will make UnicodeChar field to contain so-called 'composite' character code that represents sequence of character codes registered with WINPORT(CompositeCharRegister). Actual sequence of WCHARs can be obtained by WINPORT(CompositeCharLookup). There is macro CI_USING_COMPOSITE_CHAR that allows to detect if given CHAR_INFO contains composite character code or normal WCHAR.
+* Both above transformations happen automatically _only_ if using WriteConsole API. If one uses WriteConsoleOutput - then its up to caller to perform that transformations. Failing to do so will cause incorrect rendering of full-width or diactrical characters.
+* CHAR_INFO's and CONSOLE_SCREEN_BUFFER_INFO's Attributes fields extended to 64 bit to be able to hold 24 bit RGB colors in higher bytes. Use macroses GET_RGB_FORE/GET_RGB_BACK/SET_RGB_FORE/SET_RGB_BACK/SET_RGB_BOTH to access that colors. Note that such colors will be used only if FOREGROUND_TRUECOLOR/BACKGROUND_TRUECOLOR attribute is set. Old attributes define colors from usual 16-elements palette used to render if ..._TRUECOLOR is not set or if backend's target doesn't support more than 16 colors.
+
+## Edirtor and menu bar: point of further improvements
+
+The F9 is captured to menu activation, configuration is still available via Alt+Shift+F9.
+
+Brief explanation how to add new menu points (by example: add new point in View sub-menu)
+
+fileedit2options.hpp - add new point in enum enumViewMenu. It is necessary because menus uses simple numbers as the position in menu and it is not so comfortable to track it by ordinals. Like MENU_VIEW_FOOBAR. Keep in mind the separators are the menu points and it has a position.
+
+fileedit2options.cpp: menu itself. Add new option in MenuDataEx ViewMenu - like {Msg::EditorMenuViewFooBar, 0, 0 } and it means we added new point without accelerator key.
+
+fileedit.cpp. in int FileEditor::IsOptionActive(int hMenu, int vMenu)  you can add the corresponding handling if you want to support checked menu item, but it is optional.
+
+fileedit.cpp, in void FileEditor::ProcessMenuCommand(int hMenu, int vMenu, FarKey accelKey)  you need to add your own handling if your menu item does not have accelerator key; and you need to modify int FileEditor::ReProcessKey(FarKey Key, int CalledFromControl) otherwise. By default, menu handler invokes acceleration key if it is exists.
+
+## Plugin API
+
+Plugins API based on FAR Manager v2 plus following changes:
+
+### Added following entries to FarStandardFunctions:
+
+* `int Execute(const wchar_t *CmdStr, unsigned int ExecFlags);`
+...where ExecFlags - combination of values of EXECUTEFLAGS.
+Executes given command line, if EF_HIDEOUT and EF_NOWAIT are not specified then command will be executed on far2l virtual terminal.
+
+* `int ExecuteLibrary(const wchar_t *Library, const wchar_t *Symbol, const wchar_t *CmdStr, unsigned int ExecFlags)`
+Executes given shared library symbol in separate process (process creation behaviour is the same as for Execute).
+symbol function must be defined as: `int 'Symbol'(int argc, char *argv[])`
+
+* `void DisplayNotification(const wchar_t *action, const wchar_t *object);`
+Shows (depending on settings - always or if far2l in background) system shell-wide notification with given title and text.
+
+* `int DispatchInterThreadCalls();`
+far2l supports calling APIs from different threads by marshalling API calls from non-main threads into main one and dispatching them on main thread at certain known-safe points inside of dialog processing loops. DispatchInterThreadCalls() allows plugin to explicitly dispatch such calls and plugin must use it periodically in case it blocks main thread with some non-UI activity that may wait for other threads.
+
+* `void BackgroundTask(const wchar_t *Info, BOOL Started);`
+If plugin implements tasks running in background it may invoke this function to indicate about pending task in left-top corner.
+    - Info is a short description of task or just its owner and must be same string when invoked with Started TRUE or FALSE.
+
+* `size_t StrCellsCount(const wchar_t *Str, size_t CharsCount);`
+Returns count of console cells which will be used to display given string of CharsCount characters.
+
+* `size_t StrSizeOfCells(const wchar_t *Str, size_t CharsCount, size_t *CellsCount, BOOL RoundUp);`
+Returns count of characters which will be used to fill up to CellsCount cells from given string of CharsCount characters.
+RoundUp argument tells what to do with full-width characters that crossed by CellsCount.
+On return CellsCount contains cells count that will be filled by returned characters count, that:
+    - Can be smaller than initial value if string has too few characters to fill all CellsCount cells or if RoundUp was set to FALSE and last character would then overflow wanted amount.
+    - Can be larger by one than initial value if RoundUp was set to TRUE and last full-width character crossed initial value specified in *CellsCount.
+
+* `TruncStr and TruncPathStr`
+This two functions not added but changed to use console cells count as string limiting factor.
+
+* `BOOL VTLogExport(HANDLE con_hnd, DWORD flags, const char *file);`
+Exports to file virtual terminal history of given VT console. Returns TRUE on success. Arguments:
+    - con_hnd - NULL means active console, otherise - must be one of handles obtained from VTEnumBackground
+    - flags - zero or combination of VT_LOGEXPORT_* constants: VT_LOGEXPORT_COLORED and VT_LOGEXPORT_WITH_SCREENLINES
+    - file - is a file path to be exported, if it points to empty string (i.e. *file = 0) then it MUST be buffer of size at least MAX_PATH (4096) characters and VT history log will be exported to file at autogenerated temporary path that will be copied into that buffer
+
+* `SIZE_T VTEnumBackground(HANDLE *con_hnds, SIZE_T count);`
+Fills given array with handles to background terminal session consoles.  
+Fills up to specified count handles, but returns background terminal session count, so if returned value > count argument - then need to extend array buffer and retry
+
+* added sort mode option "executables first", that works with the file panel by `FILE_ATTRIBUTE_EXECUTABLE` option. It is available for plug-ins in the same manner as "directories first" option so plug-ins are able to handle it as they need.
+
+### Added following commands into FILE_CONTROL_COMMANDS:
+* `FCTL_GETPANELPLUGINHANDLE`
+Can be used to interact with plugin that renders other panel.
+`hPlugin` can be set to `PANEL_ACTIVE` or `PANEL_PASSIVE`.
+`Param1` ignored.
+`Param2` points to value of type `HANDLE`, call sets that value to handle of plugin that renders specified panel or `INVALID_HANDLE_VALUE`.
+
+### Added following plugin-exported functions:
+* `int MayExitFARW();`
+far2l asks plugin if it can exit now. If plugin has some background tasks pending it may block exiting of far2l, however it highly recommended to give user choice using UI prompt.
+
+* `int GetLinkTargetW(HANDLE hPlugin, struct PluginPanelItem *PanelItem, wchar_t *Target, size_t TargetSize, int OpMode);`
+far2l uses this to resolve symlink destination when user selects plugin's item that has FILE_ATTRIBUTE_REPARSE_POINT. Target is displayed in status field as for local symlinks.
+
+* `int GetFileGroup(const wchar_t *Computer, const wchar_t *Name, wchar_t *Group, int Size);`
+* `int GetFileGroupA(const char *Computer, const char *Name, char *Group);`
+to obtain file group
+* See several additional with arclie in farplug-wide.h in [3b60489](https://github.com/elfmz/far2l/commit/3b6048914bd025a61b24cf6ed237f0e0da2e364c)
+
+### Added following entries to 	struct OpenPluginInfo:
+* `CurURL` pointer to retrieve URL path from plugin. Not always useful, but for network-related plugins it allows to provide URLs useful in external utilites.
+
+### Added following dialog messages:
+* `DM_SETREADONLY` - changes readonly-ness of selected dialog edit control item
+* `DM_GETDEFAULTCOLOR`
+* `DM_GETCOLOR = DM_SETTRUECOLOR` - sets 24-bit RGB colors to selected dialog item (see DN_CTLCOLORDLGITEM).
+* `DM_SETCOLOR = DM_GETTRUECOLOR` - retrieves 24-bit RGB colors of selected dialog item.
+* `DM_SETTEXTPTRSILENT`
+* `ECTL_ADDTRUECOLOR` - applies coloring to editor like ECTL_ADDCOLOR does but allows to specify 24 RGB color using EditorTrueColor structure.
+* `ECTL_GETTRUECOLOR` - retrieves coloring of editor like ECTL_GETCOLOR does but gets 24 RGB color using EditorTrueColor structure.
+* `DN_KEY` - Param2 retrives bitmasked state of the keys KEY_SHIFT, KEY_ALT and KEY_CTRL when Param1 equals to -1.
+* `DN_DROPDOWNOPENED` - Param2 = 1 - open, 0 - closed.
+
+Note that all true-color capable messages extend but don't replace 'base' 16 palette colors. This is done intentionally as far2l may run in terminal that doesn't support true color palette, and in such case 24bit colors will be ignored and base palette attributes will be used instead.
+Size of colors array is `DLG_ITEM_MAX_CUST_COLORS` which is currently 5.
+
+### Added new flags:
+* Flags to **manage markers** in **panel** from plugins API
+(a la global parameters `Opt.ShowFilenameMarks` and `Opt.FilenameMarksAlign`):
+    - `OPIF_HL_MARKERS_NOSHOW` and `OPIF_HL_MARKERS_NOALIGN` (in `enum OPENPLUGININFO_FLAGS`);
+    - `PFLAGS_HL_MARKERS_NOSHOW` and `PFLAGS_HL_MARKERS_NOALIGN` (in `enum PANELINFOFLAGS`).
+* Flag which prevents the removal of ampersand characters from menu items being iterated in `VMenu::FindItem()`
+(for the proper work of `History::GetAllSimilar()` function and in other similar situations):
+    - `LIFIND_KEEPAMPERSAND` (in `enum FARLISTFINDFLAGS`);
+* Flags in `enum PROCESSNAME_FLAGS` (added in #2452):
+    - `PN_GENERATENAME`, `PN_CHECKMASK`, `PN_SHOWERRORMESSAGE`, `PN_RESERVED1`, `PN_CASESENSITIVE`, `PN_NONE`
+
+### Non-modal dialogs:
+ `FDLG_NONMODAL` is now available (see https://github.com/elfmz/far2l/issues/2867#issuecomment-3368134072).
+
+ You can find a full example in [hexitor](https://github.com/elfmz/far2l/blob/master/hexitor/src/editor.cpp),
+which uses a modeless dialog to function.
+
+ In short:
+
+* You need to store an instance of your class in `DM_GETDLGDATA`, which is the last parameter of the `_PSI.DialogInit` function.
+* Then, in the dialog handler function, you retrieve its instance:
+
+    ```cpp
+    editor* instance = reinterpret_cast<editor*>(_PSI.SendDlgMessage(dlg, DM_GETDLGDATA, 0, (LONG_PTR)nullptr));
+    ```
+
+* You delete the instance when the handler is called with the `DN_CLOSE` parameter. Remember to set `DM_SETDLGDATA` to null at end.

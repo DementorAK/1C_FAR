@@ -10,6 +10,7 @@ use crate::base::reader::FileReader;
 /// It imports the business-logic helpers from `panels`, `ui`, `lang`, and `v8`,
 /// which are shared between API versions.
 use crate::far::far3::api::*;
+use crate::far::lang::{get_msg, Msg};
 use crate::far::panels::{FileType, PluginPanel};
 use crate::far::settings::PluginSettings;
 use crate::far::{MENU_GUID, PLUGIN_GUID, STARTUP_INFO};
@@ -479,12 +480,11 @@ pub unsafe extern "system" fn ProcessPanelEventW(info: *const ProcessPanelEventI
         let panel = &mut *(info.hPanel as *mut PluginPanel);
 
         if info.Event == FE_CLOSE as isize && panel.is_modified {
-            let msg_title = crate::far::far3::api::to_wide("Сохранение");
-            let msg_text =
-                crate::far::far3::api::to_wide("Состав контейнера был изменен. Сохранить?");
-            let btn_yes = crate::far::far3::api::to_wide("Да");
-            let btn_no = crate::far::far3::api::to_wide("Нет");
-            let btn_cancel = crate::far::far3::api::to_wide("Отмена");
+            let msg_title = to_wide(&get_msg(Msg::SavingTitle));
+            let msg_text = to_wide(&get_msg(Msg::SaveModifiedMsg));
+            let btn_yes = to_wide(&get_msg(Msg::Ok));
+            let btn_no = to_wide(&get_msg(Msg::No));
+            let btn_cancel = to_wide(&get_msg(Msg::Cancel));
 
             let items = [
                 msg_title.as_ptr(),

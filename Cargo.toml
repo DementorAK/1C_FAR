@@ -1,6 +1,6 @@
 [package]
 name = "far1c"
-version = "0.6.1"
+version = "0.6.2"
 description = "FAR Manager plugin for 1C:Enterprise artifacts (.epf, .erf, .cf, .cfe, .1cd)"
 authors = ["Dmitry Kinash <dv.kinash@gmail.com>"]
 edition = "2021"
@@ -30,6 +30,7 @@ uuid = { version = "1.3", features = ["v4"] }
 widestring = "1.0"
 log = "0.4"
 chrono = "0.4.44"
+memoffset = "0.9.1"
 
 # Platform-conditional loggers
 [target.'cfg(windows)'.dependencies]

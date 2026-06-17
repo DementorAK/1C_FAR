@@ -4,7 +4,7 @@ use std::path::PathBuf;
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let current_version = std::env::var("CARGO_PKG_VERSION").unwrap();
-    let mut build_num_path = PathBuf::from(manifest_dir);
+    let mut build_num_path = PathBuf::from(&manifest_dir);
     build_num_path.push("build_num.txt");
 
     let mut build_num: u32 = 0;
@@ -50,4 +50,6 @@ fn main() {
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=build_num.txt");
+    println!("cargo:rerun-if-changed=dist");
+
 }
