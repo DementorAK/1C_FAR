@@ -10,50 +10,53 @@ Thank you for your interest in contributing to **far1c**! This document provides
 - FAR Manager 3 (Windows) or far2l (Linux) for testing
 - Test 1C artifacts (`.epf`, `.erf`, `.cf`, `.cfe` files) — samples are provided in the `tests/` directory
 
-### Building
+### Checking Code
+
+When working on different features, use `cargo check` with the respective target platform:
 
 ```bash
-# Debug build (Windows / FAR 3 default)
-cargo build
+# Windows (far3 - default)
+cargo check --target x86_64-pc-windows-msvc
 
-# Release build (Windows / FAR 3 default)
-# → assembles dist to target/release/far3/ (*.lng copied by build.rs)
-cargo build --release
+# Linux (far2l)
+cargo check --no-default-features --features far2l --target x86_64-unknown-linux-gnu
 
-# Release build (Linux / far2l / far2m)
-# → assembles dist to target/release/far2/ (*.lng + copy_to_far2l.sh copied by build.rs)
-cargo build --release --no-default-features --features far2
+# Linux (far2m)
+cargo check --no-default-features --features far2m --target x86_64-unknown-linux-gnu
 
 # Run tests
 cargo test
 ```
 
-### Installing for Testing
+### Building and Installing
 
-After a release build, `build.rs` automatically assembles a dist directory with all files needed for deployment:
+The project provides automation scripts to build the release version and deploy it.
 
-| Build | Output directory | Contents |
-|-------|-----------------|----------|
-| `far3` (default) | `target/release/far3/` | `far1c.dll` \*, `far1c_en.lng`, `far1c_ru.lng` |
-| `far2` | `target/release/far2/` | `far1c.far-plug-wide` \*, `far1c_en.lng`, `far1c_ru.lng`, `copy_to_far2l.sh` |
+**Windows (FAR 3)**
+Run the PowerShell script:
 
-\* The library binary must be copied into the dist directory as a separate step (done automatically by CI).
-
-**Windows** — copy the entire `target\release\far3\` to `%FARHOME%\Plugins\far1c\`:
-```cmd
-:: After: cargo build --release
-copy target\release\far1c.dll target\release\far3\far1c.dll
-xcopy /E /I target\release\far3 "%FARHOME%\Plugins\far1c\"
+```powershell
+.\build_release.ps1
 ```
 
-**Linux (far2l)** — copy library then run `copy_to_far2l.sh`:
+This script will:
+
+- Run `cargo build --release`
+- Assemble `far1c.dll` and `.lng` files into `target\release\far3\`
+- Attempt to create a junction point in `C:\Program Files\Far Manager\Plugins\Far1C` (requires Administrator privileges) so you don't need to manually copy files after each build.
+
+**Linux (far2l / far2m)**
+Run the Shell script:
+
 ```bash
-# After: cargo build --release --no-default-features --features far2
-cp target/release/libfar1c.so target/release/far2/far1c.far-plug-wide
-chmod +x dist/copy_to_far2l.sh
-dist/copy_to_far2l.sh
+./build_release.sh
 ```
-The script installs the plugin binary to `/usr/lib/far2l/Plugins/far1c/` and language files to `/usr/share/far2l/Plugins/far1c/plug/` (requires `sudo`).
+
+This script will:
+
+- Build the `far2l` feature, rename the binary to `far1c.far-plug-wide`, and assemble it with language files into `target/release/far2l/`.
+- Build the `far2m` feature (keeping the same build number), rename the binary, and assemble it into `target/release/far2m/`.
+- For `far2l`, you can then run `target/release/far2l/copy_to_far2l.sh` to install the plugin into standard system paths (`/usr/lib/far2l/Plugins/far1c/`, `/usr/share/far2l/Plugins/far1c/`).
 
 ## Project Structure
 
@@ -61,7 +64,7 @@ The codebase is organized into three layers:
 
 | Layer | Directory | Responsibility |
 |-------|-----------|----------------|
-| **Layer 1** | `src/far/` | FAR API interaction. Uses Dual-API Architecture (`far3` for Windows, `far2` for Linux) with `traits.rs` abstraction. |
+| **Layer 1** | `src/far/` | FAR API interaction. Uses Static Multi-Feature Architecture (`far3` for Windows, `far2l` and `far2m` for Linux) with `traits.rs` design abstraction. |
 | **Layer 2** | `src/v8/` | 1C artifact parsing, VFS tree construction, container repacking |
 | **Layer 3** | `src/base/` | Low-level I/O, bracket-format parser, DEFLATE compression |
 

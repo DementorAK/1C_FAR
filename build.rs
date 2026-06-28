@@ -21,17 +21,21 @@ fn main() {
         }
     }
 
-    if current_version != last_version {
-        build_num = 1;
-    } else {
-        build_num += 1;
-    }
+    let keep_build_num = std::env::var("FAR1C_KEEP_BUILD_NUM").is_ok();
 
-    fs::write(
-        &build_num_path,
-        format!("{}:{}", current_version, build_num),
-    )
-    .expect("Failed to write build_num.txt");
+    if !keep_build_num {
+        if current_version != last_version {
+            build_num = 1;
+        } else {
+            build_num += 1;
+        }
+
+        fs::write(
+            &build_num_path,
+            format!("{}:{}", current_version, build_num),
+        )
+        .expect("Failed to write build_num.txt");
+    }
 
     let mut version_rs_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     version_rs_path.push("version.rs");

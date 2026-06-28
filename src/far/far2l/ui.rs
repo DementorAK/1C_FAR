@@ -1,4 +1,4 @@
-use crate::far::far2::api::*;
+use crate::far::far2l::api::*;
 use crate::far::lang::{get_msg, Msg};
 use crate::far::settings::{PluginSettings, UnpackStyle};
 use std::ptr;
@@ -15,12 +15,12 @@ const INVALID_HANDLE_VALUE: HANDLE = -1isize as HANDLE;
 
 pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings> {
     unsafe {
-        let api = (*std::ptr::addr_of!(crate::far::FAR_API)).as_ref()?;
-        let di = api.dialog_init?;
-        let dr = api.dialog_run?;
-        let df = api.dialog_free?;
-        let sc = api.send_dlg_message?;
-        let module_number = api.module_number;
+        let api = crate::far::STARTUP_INFO?;
+        let di = api.DialogInit?;
+        let dr = api.DialogRun?;
+        let df = api.DialogFree?;
+        let sc = api.SendDlgMessage?;
+        let module_number = api.ModuleNumber;
 
         // All wide strings must live until DialogFree — never pass null PtrData!
         // far2l dereferences PtrData without null check => SIGSEGV if null.
@@ -144,14 +144,11 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             0,
         );
 
-        let _ = std::fs::write("/tmp/far1c_dlg.log", format!("DialogInit handle: {:?}\n", h_dlg));
-
         if h_dlg.is_null() || h_dlg == INVALID_HANDLE_VALUE || h_dlg as usize == 0xFFFFFFFF {
             return None;
         }
 
         let ret = dr(h_dlg);
-        let _ = std::fs::write("/tmp/far1c_dlg_run.log", format!("DialogRun ret: {}\n", ret));
 
         if ret == 9 {
             // OK button index

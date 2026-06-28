@@ -11,12 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
-- Phase 5: Documentation update (Architecture V2) and GitHub Actions (CI)
-- Phase 6: Linux Version — far2l complete implementation, cross-compilation and testing
-- Phase 7: `.cf` / `.cfe` — full metadata hierarchy navigation and cascading rebuild
-- Phase 8: Protected modules — bytecode disassembler
-- Phase 9: `.1cd` — file database navigation and configuration replacement
-- Phase 10: Lazy loading for large files (> 100 MB) and compatibility polish
+- Phase 8: Presentation styles implementation (Raw, Full-parse, V8Unpack, Saby)
+- Phase 9: CF/CFE: metadata hierarchy, cascading rebuild
+- Phase 10: Protected modules: bytecode disassembler
+- Phase 11: 1CD: file database navigation
+- Phase 12: Polish: lazy loading, compatibility testing
+
+---
+
+## [0.7.5] — 2026-06-28
+
+### Added
+
+- Build helper scripts (`build_release.ps1` for Windows, `build_release.sh` for Linux) for automated cross-compilation and packaging.
+- Separate `far2l` and `far2m` Cargo features, replacing the generic `far2` feature.
+
+### Changed
+
+- Transitioned architecture from Dual-API (dynamic wrapper) to Static Multi-Feature Architecture (V3).
+- Platform-specific implementations are now statically linked at compile time (`far3`, `far2l`, `far2m`), removing runtime dispatch overhead.
+- Re-aligned project documentation (`README.md`, `README.ru.md`, `CONTRIBUTING.md`, `srs.md`, `traits.rs`) with Architecture V3 and updated the project plan structure.
 
 ---
 

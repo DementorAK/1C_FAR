@@ -55,10 +55,8 @@ impl PluginSettings {
             };
             let create_result = sctl(invalid_handle, crate::far::api::SCTL_CREATE, 0, &mut sc as *mut _ as *mut _);
             if create_result == 0 {
-                info!("Settings::load: SCTL_CREATE failed (returned 0), using defaults");
                 return settings;
             }
-            info!("Settings::load: SCTL_CREATE succeeded, handle={:?}", sc.Handle);
 
             // Read CreateBackup (QWORD)
             let name_cb = crate::far::string_utils::to_wide("CreateBackup");
@@ -72,9 +70,6 @@ impl PluginSettings {
             let get_result = sctl(sc.Handle, crate::far::api::SCTL_GET, 0, &mut item as *mut _ as *mut _);
             if get_result != 0 {
                 settings.create_backup = item.Value.Number != 0;
-                info!("Settings::load: CreateBackup = {} (raw={})", settings.create_backup, item.Value.Number);
-            } else {
-                info!("Settings::load: CreateBackup not found, using default ({})", settings.create_backup);
             }
 
             // Read UnpackStyle (QWORD)
@@ -95,9 +90,6 @@ impl PluginSettings {
                     3 => UnpackStyle::Saby,
                     _ => UnpackStyle::default(),
                 };
-                info!("Settings::load: UnpackStyle = {:?} (raw={})", settings.unpack_style, item2.Value.Number);
-            } else {
-                info!("Settings::load: UnpackStyle not found, using default ({:?})", settings.unpack_style);
             }
 
             sctl(sc.Handle, crate::far::api::SCTL_FREE, 0, std::ptr::null_mut());
@@ -134,10 +126,8 @@ impl PluginSettings {
             };
             let create_result = sctl(invalid_handle, crate::far::api::SCTL_CREATE, 0, &mut sc as *mut _ as *mut _);
             if create_result == 0 {
-                info!("Settings::save: SCTL_CREATE failed (returned 0), cannot save");
                 return;
             }
-            info!("Settings::save: SCTL_CREATE succeeded, handle={:?}", sc.Handle);
 
             // Write CreateBackup (QWORD)
             let name_cb = crate::far::string_utils::to_wide("CreateBackup");
@@ -148,8 +138,7 @@ impl PluginSettings {
                 Type: crate::far::api::FST_QWORD,
                 Value: crate::far::api::FarSettingsValueData { Number: if self.create_backup { 1 } else { 0 } },
             };
-            let set_result = sctl(sc.Handle, crate::far::api::SCTL_SET, 0, &mut item as *mut _ as *mut _);
-            info!("Settings::save: CreateBackup set={}, result={}", self.create_backup, set_result);
+            sctl(sc.Handle, crate::far::api::SCTL_SET, 0, &mut item as *mut _ as *mut _);
 
             // Write UnpackStyle (QWORD)
             let name_us = crate::far::string_utils::to_wide("UnpackStyle");
@@ -160,15 +149,13 @@ impl PluginSettings {
                 Type: crate::far::api::FST_QWORD,
                 Value: crate::far::api::FarSettingsValueData { Number: self.unpack_style as u64 },
             };
-            let set_result2 = sctl(sc.Handle, crate::far::api::SCTL_SET, 0, &mut item2 as *mut _ as *mut _);
-            info!("Settings::save: UnpackStyle set={:?}, result={}", self.unpack_style, set_result2);
+            sctl(sc.Handle, crate::far::api::SCTL_SET, 0, &mut item2 as *mut _ as *mut _);
 
             sctl(sc.Handle, crate::far::api::SCTL_FREE, 0, std::ptr::null_mut());
-            info!("Settings::save: SCTL_FREE done, settings saved");
         }
     }
 
-    #[cfg(feature = "far2")]
+    #[cfg(any(feature = "far2l", feature = "far2m"))]
     pub fn load() -> Self {
         use log::info;
         let mut settings = Self::default();
@@ -212,7 +199,6 @@ impl PluginSettings {
                 match key {
                     "CreateBackup" => {
                         settings.create_backup = value != "0";
-                        info!("Settings::load (far2): CreateBackup = {}", settings.create_backup);
                     }
                     "UnpackStyle" => {
                         let raw: u32 = value.parse().unwrap_or(1);
@@ -223,7 +209,6 @@ impl PluginSettings {
                             3 => UnpackStyle::Saby,
                             _ => UnpackStyle::default(),
                         };
-                        info!("Settings::load (far2): UnpackStyle = {:?} (raw={})", settings.unpack_style, raw);
                     }
                     _ => {}
                 }
@@ -233,7 +218,7 @@ impl PluginSettings {
         settings
     }
 
-    #[cfg(feature = "far2")]
+    #[cfg(any(feature = "far2l", feature = "far2m"))]
     pub fn save(&self) {
         use log::info;
 
@@ -258,11 +243,6 @@ impl PluginSettings {
             self.unpack_style as u32
         );
 
-        if let Err(e) = std::fs::write(&ini_path, &content) {
-            info!("Settings::save (far2): failed to write {}: {}", ini_path, e);
-        } else {
-            info!("Settings::save (far2): saved CreateBackup={}, UnpackStyle={:?}",
-                  self.create_backup, self.unpack_style);
-        }
+        let _ = std::fs::write(&ini_path, &content);
     }
 }

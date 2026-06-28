@@ -7,11 +7,16 @@ pub mod traits; // FarHost trait: abstraction over API version differences // Cr
 #[cfg(feature = "far3")]
 pub mod far3; // FAR Manager 3 — bindings + exports
 
-#[cfg(feature = "far2")]
-pub mod far2; // far2l / far2m — bindings + exports (Phase 4B)
+#[cfg(feature = "far2l")]
+pub mod far2l;
 
-#[cfg(feature = "far2")]
-pub use crate::far::far2::api;
+#[cfg(feature = "far2m")]
+pub mod far2m;
+
+#[cfg(feature = "far2l")]
+pub use crate::far::far2l::api;
+#[cfg(feature = "far2m")]
+pub use crate::far::far2m::api;
 #[cfg(feature = "far3")]
 pub use crate::far::far3::api;
 
@@ -22,10 +27,7 @@ pub mod ui;
 
 pub static mut STARTUP_INFO: Option<api::PluginStartupInfo> = None;
 
-#[cfg(feature = "far2")]
-pub static mut FAR_API: Option<far2::far_api::FarApi> = None;
-
-#[cfg(feature = "far2")]
+#[cfg(any(feature = "far2l", feature = "far2m"))]
 pub static INI_FILE_PATH: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 pub const PLUGIN_GUID: api::GUID = api::GUID {

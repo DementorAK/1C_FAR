@@ -21,54 +21,40 @@ A cross-platform plugin for **FAR Manager** / **far2l** that provides transparen
 
 ## Installation
 
-### Building from Source
+## Supported Platforms
+
+- **Windows**: Far Manager 3.x (`far3`)
+- **Linux/macOS**: far2l (`far2l`)
+- **macOS/Linux**: far2m (`far2m`)
+
+A separate plugin binary is built for each platform.
+
+### Building and Installation
 
 **Prerequisites:** [Rust toolchain](https://rustup.rs/) (1.88+)
 
-```bash
-# Windows / FAR Manager 3 (default)
-cargo build --release
-# → dist package: target/release/far3/
+The project provides automated scripts to build the release version and deploy it.
 
-# Linux / far2l / far2m
-cargo build --release --no-default-features --features far2
-# → dist package: target/release/far2/
+#### Windows (FAR Manager 3)
+
+Run the PowerShell script:
+
+```powershell
+.\build_release.ps1
 ```
 
-After a release build, `build.rs` automatically assembles a ready-to-deploy directory:
+This script runs `cargo build --release`, assembles the plugin and language files in `target\release\far3\`, and creates a junction point in `%FARHOME%\Plugins\Far1C` so the plugin is automatically available in FAR (need to restart FAR).
 
-| Build | Output directory | Contents |
-|-------|-----------------|----------|
-| `far3` (default) | `target/release/far3/` | `far1c.dll`, `far1c_en.lng`, `far1c_ru.lng` |
-| `far2` | `target/release/far2/` | `far1c.far-plug-wide`, `far1c_en.lng`, `far1c_ru.lng`, `copy_to_far2l.sh` |
+#### Linux (far2l / far2m)
 
-> **Note:** `build.rs` prepares the `.lng` files and helper script. The CI workflow (or the manual step below) copies the compiled library into the same directory with the correct name.
+Run the Shell script:
 
-### Windows (FAR Manager 3)
+```bash
+./build_release.sh
+```
 
-1. Build the plugin: `cargo build --release`
-2. Copy `target\release\far1c.dll` into `target\release\far3\` (CI does this automatically)
-3. Copy the entire `target\release\far3\` directory to `%FARHOME%\Plugins\far1c\`
-4. Restart FAR Manager — the plugin will appear in the `F11` menu
-
-### Linux (far2l)
-
-1. Build the plugin:
-   ```bash
-   cargo build --release --no-default-features --features far2
-   ```
-2. Copy the compiled library into the dist directory:
-   ```bash
-   cp target/release/libfar1c.so target/release/far2/far1c.far-plug-wide
-   ```
-3. Run the helper script to install into the system FHS paths:
-   ```bash
-   chmod +x dist/copy_to_far2l.sh
-   dist/copy_to_far2l.sh
-   ```
-4. Restart far2l
-
-> **Note:** The script uses `sudo` to install the plugin binary to `/usr/lib/far2l/Plugins/far1c/far1c.far-plug-wide` and language files to `/usr/share/far2l/Plugins/far1c/plug/` in accordance with the far2l FHS standard.
+This script cross-compiles both the `far2l` and `far2m` features and assembles them in `target/release/far2l/` and `target/release/far2m/` respectively.
+For `far2l`, you can run `target/release/far2l/copy_to_far2l.sh` (requires `sudo`) to install the plugin into standard system paths (`/usr/lib/far2l/Plugins/far1c/`, `/usr/share/far2l/Plugins/far1c/`).
 
 > **Note:** Language files (`*.lng`) are required for proper localization of the plugin UI. Without them, the plugin will display raw message IDs instead of translated strings.
 
@@ -108,17 +94,23 @@ The project follows a three-layer architecture:
 ```
 src/
 ├── lib.rs                       # Entry point, conditional Far API export
-├── far/                         # LAYER 1: FAR Manager interaction (Dual-API)
-│   ├── far3/                    # Implementation for FAR 3 (Windows)
+├── far/                         # LAYER 1: FAR Manager interaction (Static Multi-Feature)
+│   ├── far3/                    # Implementation for FAR Manager 3 (Windows)
 │   │   ├── api.rs               # Far Plugin SDK 3.0 bindings
-│   │   └── exports.rs           # Exported C ABI functions
-│   ├── far2/                    # Implementation for far2l/far2m (Linux/macOS)
+│   │   ├── exports.rs           # Exported C ABI functions
+│   │   └── ui.rs                # UI dialogs for FAR 3
+│   ├── far2l/                   # Implementation for far2l (Linux/macOS)
 │   │   ├── api.rs               # far2l Plugin API bindings
-│   │   └── exports.rs           # Exported C ABI functions
+│   │   ├── exports.rs           # Exported C ABI functions
+│   │   └── ui.rs                # UI dialogs for far2l
+│   ├── far2m/                   # Implementation for far2m (Linux/macOS/BSD)
+│   │   ├── api.rs               # far2m Plugin API bindings
+│   │   ├── exports.rs           # Exported C ABI functions
+│   │   └── ui.rs                # UI dialogs for far2m
 │   ├── string_utils.rs          # Cross-platform string handling (u16/u32)
-│   ├── traits.rs                # FarHost trait for API abstraction
+│   ├── traits.rs                # FarHost design abstraction
 │   ├── panels.rs                # Virtual file panel logic (VFS, navigation, commit)
-│   ├── ui.rs                    # UI elements (dialogs, progress bars, menus)
+│   ├── ui.rs                    # UI mount point (abstraction over platform-specific ui.rs)
 │   ├── lang.rs                  # Localization via .lng files
 │   └── settings.rs              # Plugin settings (unpack style, backup)
 ├── v8/                          # LAYER 2: 1C artifact semantics
@@ -139,16 +131,17 @@ src/
 |-------|-------------|--------|
 | Phase 0 | Infrastructure setup | ✅ Complete |
 | Phase 1 | Plugin skeleton + CF parser | ✅ Complete |
-| Phase 2 | EPF/ERF: VFS tree, F3/F4, CF-writer, settings, localization | ✅ Complete |
+| Phase 2 | EPF/ERF (MVP): VFS tree, F3/F4, CF-writer, settings, localization | ✅ Complete |
 | Phase 3 | Documentation & GitHub primary publication | ✅ Complete |
-| Phase 4A| Dual-API refactoring (FAR 3) | ✅ Complete |
-| Phase 4B| far2l basic integration | ✅ Complete |
-| Phase 5 | Documentation update V2 & CI | 🔄 In progress |
-| Phase 6 | Linux version (build, stubs, testing) | 🔜 Planned |
-| Phase 7 | CF/CFE: metadata hierarchy, cascading rebuild | 🔜 Planned |
-| Phase 8 | Protected modules: bytecode disassembler | 🔜 Planned |
-| Phase 9 | 1CD: file database navigation | 🔜 Planned |
-| Phase 10| Polish: lazy loading, large files | 🔜 Planned |
+| Phase 4 | Dual-API refactoring (FAR 3) and far2l basic implementation | ✅ Complete |
+| Phase 5 | Documentation update V2 | ✅ Complete |
+| Phase 6 | Linux version (build, implementation) | ✅ Complete |
+| Phase 7 | Cross-platform stability (Static Multi-Feature) | ✅ Complete |
+| Phase 8 | Presentation styles implementation (Raw, Full-parse, V8Unpack, Saby) | 🔄 In progress |
+| Phase 9 | CF/CFE: metadata hierarchy, cascading rebuild | 🔜 Planned |
+| Phase 10 | Protected modules: bytecode disassembler | 🔜 Planned |
+| Phase 11 | 1CD: file database navigation | 🔜 Planned |
+| Phase 12 | Polish: lazy loading, compatibility testing | 🔜 Planned |
 
 ## Documentation
 

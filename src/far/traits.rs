@@ -1,13 +1,12 @@
 //! `FarHost` — abstraction over Far Manager API version differences.
 //!
-//! This trait is **not yet fully wired up** — it documents the intended
-//! interface for the future dual-API implementation.  The concrete
-//! implementations will live in `far::far3` (FAR 3, Windows) and
-//! `far::far2` (far2l/far2m, Linux).
+//! This trait defines the conceptual interface for interacting with different FAR APIs.
+//! In the current Static Multi-Feature architecture (V3), the concrete
+//! implementations are statically linked at compile time based on the active feature:
+//! `far3` (FAR Manager 3, Windows), `far2l` (far2l, Linux/macOS), or `far2m` (far2m, Linux/macOS/BSD).
 //!
-//! For now (Phase 4A) the trait exists as a design artifact; the actual
-//! call-sites in `panels.rs` / `ui.rs` still go through the concrete
-//! API layer directly.  Phase 4B will complete the wiring.
+//! The trait serves as a design abstraction and documentation for the
+//! expected behavior of the platform-specific API layers.
 
 /// Describes operations that differ between FAR 3 and FAR 2 Plugin APIs.
 #[allow(dead_code)]

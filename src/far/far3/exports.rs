@@ -174,8 +174,8 @@ pub unsafe extern "system" fn OpenW(info: *const OpenInfo) -> HANDLE {
 
         let mut path = String::new();
 
-        // OPEN_ANALYSE = 9
-        if info.OpenFrom == 9 && info.Data != 0 {
+        // OPEN_ANALYSE
+        if info.OpenFrom == OPEN_ANALYSE && info.Data != 0 {
             let analyse_info = &*(info.Data as *const OpenAnalyseInfo);
             if !analyse_info.Handle.is_null() {
                 let path_wide_ptr = analyse_info.Handle as *mut Vec<u16>;
@@ -184,7 +184,7 @@ pub unsafe extern "system" fn OpenW(info: *const OpenInfo) -> HANDLE {
                     path_wide.as_slice().strip_suffix(&[0]).unwrap_or(path_wide),
                 );
             }
-        } else if info.OpenFrom == 1 {
+        } else if info.OpenFrom == OPEN_PLUGINSMENU {
             // OPEN_PLUGINSMENU
             if let Some(current_path) = get_current_path() {
                 path = current_path;
@@ -248,7 +248,7 @@ pub unsafe extern "system" fn GetOpenPanelInfoW(info: *mut GetOpenPanelInfo) {
         info.PanelTitle =
             Box::leak(to_wide(" 1C:Enterprise Artifacts ").into_boxed_slice()).as_ptr();
         info.CurDir = Box::leak(to_wide("\\").into_boxed_slice()).as_ptr();
-        info.Flags = 1 | 8 | 16;
+        info.Flags = OPIF_ADDDOTS | OPIF_RAWSELECTION;
         return;
     }
 
@@ -256,7 +256,7 @@ pub unsafe extern "system" fn GetOpenPanelInfoW(info: *mut GetOpenPanelInfo) {
     let title = panel.panel_title();
     info.PanelTitle = Box::leak(to_wide(&title).into_boxed_slice()).as_ptr();
     info.CurDir = Box::leak(to_wide(&panel.cur_dir_str()).into_boxed_slice()).as_ptr();
-    info.Flags = 1 | 8 | 16; // OPIF_ADDDOTS | OPIF_USEFILTER | OPIF_USESORTGROUPS
+    info.Flags = OPIF_ADDDOTS | OPIF_RAWSELECTION;
 }
 
 #[no_mangle]
@@ -267,8 +267,7 @@ pub unsafe extern "system" fn ClosePanelW(info: *const ClosePanelInfo) {
         }
         let info = &*info;
         if !info.hPanel.is_null() {
-            let panel = Box::from_raw(info.hPanel as *mut PluginPanel);
-            info!("Closing panel for: {}", panel.path);
+            drop(Box::from_raw(info.hPanel as *mut PluginPanel));
         }
     });
 }

@@ -44,7 +44,7 @@ pub fn to_wide32(s: &str) -> Vec<u32> {
 
 // ── far2 (far2 feature): wchar_t = u32 (UTF-32) ─────────────────────────────
 
-#[cfg(feature = "far2")]
+#[cfg(any(feature = "far2l", feature = "far2m"))]
 /// Convert a Rust &str to a NUL-terminated Vec<u32> (UTF-32).
 pub fn to_wide(s: &str) -> Vec<u32> {
     s.chars()
@@ -53,7 +53,7 @@ pub fn to_wide(s: &str) -> Vec<u32> {
         .collect()
 }
 
-#[cfg(feature = "far2")]
+#[cfg(any(feature = "far2l", feature = "far2m"))]
 /// Read a NUL-terminated *const u32 wide string into a Rust String.
 ///
 /// # Safety
@@ -70,7 +70,7 @@ pub unsafe fn from_wide_ptr(ptr: *const u32) -> String {
     slice.iter().filter_map(|&c| char::from_u32(c)).collect()
 }
 
-#[cfg(feature = "far2")]
+#[cfg(any(feature = "far2l", feature = "far2m"))]
 /// Convert a Rust &str to a NUL-terminated Vec<u16>.
 /// On far2 this is unused at the API level, but provided for symmetry.
 #[allow(dead_code)]

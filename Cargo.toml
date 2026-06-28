@@ -1,6 +1,6 @@
 [package]
 name = "far1c"
-version = "0.6.2"
+version = "0.7.5"
 description = "FAR Manager plugin for 1C:Enterprise artifacts (.epf, .erf, .cf, .cfe, .1cd)"
 authors = ["Dmitry Kinash <dv.kinash@gmail.com>"]
 edition = "2021"
@@ -12,13 +12,14 @@ keywords = ["far-manager", "1c-enterprise", "plugin", "virtual-filesystem"]
 categories = ["filesystem", "development-tools"]
 build = "build.rs"
 
-# --- Plugin API version selection ---
-# Use `--features far2 --no-default-features` to build for far2l/far2m (Linux).
+# Use `--features far2l --no-default-features` to build for far2l (Linux/macOS).
+# Use `--features far2m --no-default-features` to build for far2m (Linux/macOS).
 # Default: far3 (FAR Manager 3, Windows).
 [features]
 default = ["far3"]
 far3 = []   # FAR Manager 3 Plugin API (Windows, wchar_t=u16)
-far2 = []   # far2l / far2m Plugin API  (Linux/macOS, wchar_t=u32)
+far2l = []  # far2l Plugin API (Linux/macOS, wchar_t=u32)
+far2m = []  # far2m Plugin API (Linux/macOS, wchar_t=u32)
 
 [lib]
 crate-type = ["cdylib"]
