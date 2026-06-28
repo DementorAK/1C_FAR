@@ -1,9 +1,14 @@
+use crate::base::reader::FileReader;
+use crate::far::settings::{PluginSettings, UnpackStyle};
+use crate::v8::styles::{
+    configurator::ConfiguratorStyle, edt::EdtStyle, full_parse::FullParseStyle, json::JsonStyle,
+    raw::RawStyle, v8unpack::V8UnpackStyle, PresentationStyle,
+};
 use crate::v8::vfs_builder::VfsEntry;
-
-use crate::far::settings::PluginSettings;
 use crate::v8::writer::ContainerWriter;
 use chrono::Local;
 use std::collections::HashMap;
+use std::fs::File;
 use std::io;
 
 /// Supported artifact types.
@@ -263,51 +268,55 @@ impl PluginPanel {
         Ok(())
     }
 
-    fn sync_vfs_to_rows(&mut self) {
-        sync_nodes_to_map(&self.vfs, &mut self.rows_map);
-    }
-}
-
-fn sync_nodes_to_map(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>>) {
-    for entry in entries {
-        match entry {
-            VfsEntry::File {
-                data,
-                origin_row_id,
-                original_container,
-                ..
-            } => {
-                if let Some(row_id) = origin_row_id {
-                    let mut final_data = data.clone();
-                    if let Some(orig_cont) = original_container {
-                        // Smart re-wrap: use original container as template
-                        if let Ok(mut nested_rows) = crate::v8::container::read_container_rows(
-                            crate::base::reader::StringReader::new(orig_cont.clone()),
-                            0,
-                        ) {
-                            // Update only the text row, preserve everything else (info, etc.)
-                            nested_rows.insert("text".to_string(), (data.clone(), false));
-
-                            // Nested containers match the original 1C format (triplets, stored text)
-                            let mut writer = ContainerWriter::new(512, false);
-                            writer.use_triplets = true;
-                            writer.pad_pt_to_page = false;
-                            writer.revision = 6;
-                            let mut buffer = Vec::new();
-                            if writer
-                                .write(&mut buffer, &nested_rows, None::<fn(usize, usize)>)
-                                .is_ok()
-                            {
-                                final_data = buffer;
-                            }
-                        }
-                    }
-                    updates.insert(row_id.clone(), final_data);
-                }
-            }
-            VfsEntry::Dir { children, .. } => {
-                sync_nodes_to_map(children, updates);
-            }
+    /// Gets the current presentation style based on settings
+    pub fn get_style(&self) -> Box<dyn PresentationStyle> {
+        match self.settings.unpack_style {
+            UnpackStyle::Raw => Box::new(RawStyle),
+            UnpackStyle::FullParse => Box::new(FullParseStyle),
+            UnpackStyle::V8Unpack => Box::new(V8UnpackStyle),
+            UnpackStyle::Json => Box::new(JsonStyle),
+            UnpackStyle::Edt => Box::new(EdtStyle),
+            UnpackStyle::Configurator => Box::new(ConfiguratorStyle),
         }
+    }
+
+    /// Rebuilds the VFS tree according to the current style
+    pub fn rebuild_vfs(&mut self) -> Result<(), String> {
+        let style = self.get_style();
+        match style.build_vfs(&self.rows_map) {
+            Ok(vfs) => {
+                self.vfs = vfs;
+                self.current_dir.clear();
+                Ok(())
+            }
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    /// Loads the container from disk into rows_map and builds VFS
+    pub fn load_container(&mut self) -> Result<(), String> {
+        let file = File::open(&self.path).map_err(|e| e.to_string())?;
+        let mut reader = FileReader::new(file).map_err(|e| e.to_string())?;
+
+        if let Ok(header) = crate::v8::container::read_image_header(&mut reader, 0) {
+            self.page_size = header.page_size;
+            self.is_64bit = header.header_size == 20;
+        }
+
+        let rows =
+            crate::v8::container::read_container_rows(reader, 0).map_err(|e| e.to_string())?;
+        self.rows_map.clear();
+        self.packed_map.clear();
+        for (id, (data, packed)) in rows {
+            self.rows_map.insert(id.clone(), data);
+            self.packed_map.insert(id, packed);
+        }
+
+        self.rebuild_vfs()
+    }
+
+    fn sync_vfs_to_rows(&mut self) {
+        let style = self.get_style();
+        style.sync_vfs_to_rows(&self.vfs, &mut self.rows_map);
     }
 }

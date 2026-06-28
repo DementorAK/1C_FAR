@@ -85,7 +85,7 @@ Access plugin settings via `F11` → Plugin Configuration, or press `F9` → Opt
 Available options:
 
 - **Create backup before saving** — creates a timestamped backup (e.g., `test.20260512-143022.epf`)
-- **Unpacking style** — Raw / Full-parse / V8Unpack-style / Saby-style
+- **Unpacking style** — Raw / Full-parse / V8Unpack-style / Json-style / EDT-style / Configurator-style
 
 ## Architecture
 
@@ -137,7 +137,7 @@ src/
 | Phase 5 | Documentation update V2 | ✅ Complete |
 | Phase 6 | Linux version (build, implementation) | ✅ Complete |
 | Phase 7 | Cross-platform stability (Static Multi-Feature) | ✅ Complete |
-| Phase 8 | Presentation styles implementation (Raw, Full-parse, V8Unpack, Saby) | 🔄 In progress |
+| Phase 8 | Presentation styles implementation (Raw, Full-parse, V8Unpack, Json, EDT, Configurator) | 🔄 In progress |
 | Phase 9 | CF/CFE: metadata hierarchy, cascading rebuild | 🔜 Planned |
 | Phase 10 | Protected modules: bytecode disassembler | 🔜 Planned |
 | Phase 11 | 1CD: file database navigation | 🔜 Planned |

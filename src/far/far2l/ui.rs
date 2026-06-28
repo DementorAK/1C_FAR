@@ -30,19 +30,22 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
         let style_raw = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleRaw));
         let style_full = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleFull));
         let style_v8 = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleV8));
-        let style_saby = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleSaby));
+        let style_json = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleJson));
+        let style_edt = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleEdt));
+        let style_configurator =
+            crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleConfigurator));
         let ok_text = crate::far::string_utils::to_wide(&get_msg(Msg::Ok));
         let cancel_text = crate::far::string_utils::to_wide(&get_msg(Msg::Cancel));
         let empty = crate::far::string_utils::to_wide("");
 
-        let mut items: [FarDialogItem; 11] = std::mem::zeroed();
+        let mut items: [FarDialogItem; 13] = [Default::default(); 13];
 
-        // 0: Double box (frame)
+        // 0: Double box
         items[0].Type = DI_DOUBLEBOX;
         items[0].X1 = 3;
         items[0].Y1 = 1;
         items[0].X2 = 60;
-        items[0].Y2 = 13;
+        items[0].Y2 = 15;
         items[0].PtrData = title.as_ptr();
 
         // 1: Checkbox (backup)
@@ -76,7 +79,11 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
         items[4].Y1 = 5;
         items[4].X2 = 58;
         items[4].Y2 = 5;
-        items[4].Param.Selected = if settings.unpack_style == UnpackStyle::Raw { 1 } else { 0 };
+        items[4].Param.Selected = if settings.unpack_style == UnpackStyle::Raw {
+            1
+        } else {
+            0
+        };
         items[4].Flags = DIF_GROUP;
         items[4].PtrData = style_raw.as_ptr();
 
@@ -86,7 +93,11 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
         items[5].Y1 = 6;
         items[5].X2 = 58;
         items[5].Y2 = 6;
-        items[5].Param.Selected = if settings.unpack_style == UnpackStyle::FullParse { 1 } else { 0 };
+        items[5].Param.Selected = if settings.unpack_style == UnpackStyle::FullParse {
+            1
+        } else {
+            0
+        };
         items[5].PtrData = style_full.as_ptr();
 
         // 6: Radio V8
@@ -95,46 +106,80 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
         items[6].Y1 = 7;
         items[6].X2 = 58;
         items[6].Y2 = 7;
-        items[6].Param.Selected = if settings.unpack_style == UnpackStyle::V8Unpack { 1 } else { 0 };
+        items[6].Param.Selected = if settings.unpack_style == UnpackStyle::V8Unpack {
+            1
+        } else {
+            0
+        };
         items[6].PtrData = style_v8.as_ptr();
 
-        // 7: Radio Saby
+        // 7: Radio Json
         items[7].Type = DI_RADIOBUTTON;
         items[7].X1 = 7;
         items[7].Y1 = 8;
         items[7].X2 = 58;
         items[7].Y2 = 8;
-        items[7].Param.Selected = if settings.unpack_style == UnpackStyle::Saby { 1 } else { 0 };
-        items[7].PtrData = style_saby.as_ptr();
+        items[7].Param.Selected = if settings.unpack_style == UnpackStyle::Json {
+            1
+        } else {
+            0
+        };
+        items[7].PtrData = style_json.as_ptr();
 
-        // 8: Separator
-        items[8].Type = DI_TEXT;
-        items[8].X1 = 5;
-        items[8].Y1 = 10;
-        items[8].Flags = DIF_SEPARATOR;
-        items[8].PtrData = empty.as_ptr();
+        // 8: Radio Edt
+        items[8].Type = DI_RADIOBUTTON;
+        items[8].X1 = 7;
+        items[8].Y1 = 9;
+        items[8].X2 = 58;
+        items[8].Y2 = 9;
+        items[8].Param.Selected = if settings.unpack_style == UnpackStyle::Edt {
+            1
+        } else {
+            0
+        };
+        items[8].PtrData = style_edt.as_ptr();
 
-        // 9: OK
-        items[9].Type = DI_BUTTON;
-        items[9].Y1 = 11;
-        items[9].Y2 = 11;
-        items[9].Flags = DIF_CENTERGROUP;
-        items[9].DefaultButton = 1;
-        items[9].PtrData = ok_text.as_ptr();
+        // 9: Radio Configurator
+        items[9].Type = DI_RADIOBUTTON;
+        items[9].X1 = 7;
+        items[9].Y1 = 10;
+        items[9].X2 = 58;
+        items[9].Y2 = 10;
+        items[9].Param.Selected = if settings.unpack_style == UnpackStyle::Configurator {
+            1
+        } else {
+            0
+        };
+        items[9].PtrData = style_configurator.as_ptr();
 
-        // 10: Cancel
-        items[10].Type = DI_BUTTON;
-        items[10].Y1 = 11;
-        items[10].Y2 = 11;
-        items[10].Flags = DIF_CENTERGROUP;
-        items[10].PtrData = cancel_text.as_ptr();
+        // 10: Separator
+        items[10].Type = DI_TEXT;
+        items[10].X1 = 5;
+        items[10].Y1 = 12;
+        items[10].Flags = DIF_SEPARATOR;
+        items[10].PtrData = empty.as_ptr();
+
+        // 11: OK
+        items[11].Type = DI_BUTTON;
+        items[11].Y1 = 13;
+        items[11].Y2 = 13;
+        items[11].Flags = DIF_CENTERGROUP;
+        items[11].DefaultButton = 1;
+        items[11].PtrData = ok_text.as_ptr();
+
+        // 12: Cancel
+        items[12].Type = DI_BUTTON;
+        items[12].Y1 = 13;
+        items[12].Y2 = 13;
+        items[12].Flags = DIF_CENTERGROUP;
+        items[12].PtrData = cancel_text.as_ptr();
 
         let h_dlg = di(
             module_number,
             -1,
             -1,
             64,
-            15,
+            17,
             ptr::null(), // HelpTopic
             items.as_mut_ptr(),
             items.len() as u32,
@@ -150,7 +195,7 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
 
         let ret = dr(h_dlg);
 
-        if ret == 9 {
+        if ret == 11 {
             // OK button index
             let mut new_settings = PluginSettings {
                 create_backup: sc(h_dlg, DM_GETCHECK, 1, 0) != 0,
@@ -164,7 +209,11 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             } else if sc(h_dlg, DM_GETCHECK, 6, 0) != 0 {
                 new_settings.unpack_style = UnpackStyle::V8Unpack;
             } else if sc(h_dlg, DM_GETCHECK, 7, 0) != 0 {
-                new_settings.unpack_style = UnpackStyle::Saby;
+                new_settings.unpack_style = UnpackStyle::Json;
+            } else if sc(h_dlg, DM_GETCHECK, 8, 0) != 0 {
+                new_settings.unpack_style = UnpackStyle::Edt;
+            } else if sc(h_dlg, DM_GETCHECK, 9, 0) != 0 {
+                new_settings.unpack_style = UnpackStyle::Configurator;
             }
 
             df(h_dlg);

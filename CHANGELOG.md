@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.3] — 2026-06-28
+
+### Added
+
+- `PresentationStyle` architecture (`src/v8/styles/mod.rs`) to support multiple unpack formats for 1C containers.
+- Comprehensive specification of 1C container presentation styles in `docs/1C/styles.md` (Raw, Full-parse, V8Unpack, Json, EDT, Configurator).
+- `EDT` and `Configurator` unpack style stubs and UI configurations for all supported platforms (far3, far2m, far2l).
+
+### Changed
+
+- Renamed `SabyStyle` to `JsonStyle` across the codebase and documentation to better reflect its Git-friendly JSON nature.
+
+---
+
 ## [0.7.5] — 2026-06-28
 
 ### Added

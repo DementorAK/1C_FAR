@@ -1,6 +1,5 @@
 #![allow(clippy::missing_safety_doc)]
 
-use crate::base::reader::FileReader;
 /// FAR Manager 3 exported plugin functions (C ABI entry points).
 ///
 /// FAR 3 calls these functions by name via the plugin DLL export table.
@@ -14,10 +13,7 @@ use crate::far::lang::{get_msg, Msg};
 use crate::far::panels::{FileType, PluginPanel};
 use crate::far::settings::PluginSettings;
 use crate::far::{MENU_GUID, PLUGIN_GUID, STARTUP_INFO};
-use crate::v8::vfs_builder::build_vfs;
 use log::info;
-use std::collections::HashMap;
-use std::fs::File;
 use std::panic;
 use std::ptr;
 
@@ -207,29 +203,11 @@ pub unsafe extern "system" fn OpenW(info: *const OpenInfo) -> HANDLE {
 
         let mut panel = PluginPanel::new(path, file_type);
 
-        if let Ok(file) = File::open(&panel.path) {
-            if let Ok(mut reader) = FileReader::new(file) {
-                if let Ok(header) = crate::v8::container::read_image_header(&mut reader, 0) {
-                    panel.page_size = header.page_size;
-                    panel.is_64bit = header.header_size == 20;
-                }
-                if let Ok(rows) = crate::v8::container::read_container_rows(reader, 0) {
-                    let mut rows_map = HashMap::new();
-                    let mut packed_map = HashMap::new();
-                    for (id, (data, packed)) in rows {
-                        rows_map.insert(id.clone(), data);
-                        packed_map.insert(id, packed);
-                    }
-                    if let Ok(vfs) = build_vfs(&rows_map) {
-                        panel.vfs = vfs;
-                        panel.rows_map = rows_map;
-                        panel.packed_map = packed_map;
-                    }
-                }
-            }
+        if panel.load_container().is_ok() {
+            Box::into_raw(Box::new(panel)) as HANDLE
+        } else {
+            ptr::null_mut()
         }
-
-        Box::into_raw(Box::new(panel)) as HANDLE
     })
     .unwrap_or(ptr::null_mut())
 }

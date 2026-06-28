@@ -1,4 +1,3 @@
-
 #[cfg(feature = "far3")]
 use crate::far::api::IntPtr;
 #[cfg(feature = "far3")]
@@ -14,13 +13,15 @@ pub enum Msg {
     UnpackStyleRaw = 4,
     UnpackStyleFull = 5,
     UnpackStyleV8 = 6,
-    UnpackStyleSaby = 7,
-    Ok = 8,
-    Cancel = 9,
-    SavingTitle = 10,
-    PackingMessage = 11,
-    SaveModifiedMsg = 12,
-    No = 13,
+    UnpackStyleJson = 7,
+    UnpackStyleEdt = 8,
+    UnpackStyleConfigurator = 9,
+    Ok = 10,
+    Cancel = 11,
+    SavingTitle = 12,
+    PackingMessage = 13,
+    SaveModifiedMsg = 14,
+    No = 15,
 }
 
 #[cfg(feature = "far3")]
@@ -64,4 +65,3 @@ pub fn get_msg(id: Msg) -> String {
 
     res
 }
-

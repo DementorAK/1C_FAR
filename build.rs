@@ -55,5 +55,4 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=build_num.txt");
     println!("cargo:rerun-if-changed=dist");
-
 }

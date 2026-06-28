@@ -4,7 +4,9 @@ pub enum UnpackStyle {
     #[default]
     FullParse = 1,
     V8Unpack = 2,
-    Saby = 3,
+    Json = 3,
+    Edt = 4,
+    Configurator = 5,
 }
 
 /// Plugin settings.
@@ -53,7 +55,12 @@ impl PluginSettings {
                 Guid: crate::far::PLUGIN_GUID,
                 Handle: invalid_handle,
             };
-            let create_result = sctl(invalid_handle, crate::far::api::SCTL_CREATE, 0, &mut sc as *mut _ as *mut _);
+            let create_result = sctl(
+                invalid_handle,
+                crate::far::api::SCTL_CREATE,
+                0,
+                &mut sc as *mut _ as *mut _,
+            );
             if create_result == 0 {
                 return settings;
             }
@@ -67,7 +74,12 @@ impl PluginSettings {
                 Type: crate::far::api::FST_QWORD,
                 Value: crate::far::api::FarSettingsValueData { Number: 0 },
             };
-            let get_result = sctl(sc.Handle, crate::far::api::SCTL_GET, 0, &mut item as *mut _ as *mut _);
+            let get_result = sctl(
+                sc.Handle,
+                crate::far::api::SCTL_GET,
+                0,
+                &mut item as *mut _ as *mut _,
+            );
             if get_result != 0 {
                 settings.create_backup = item.Value.Number != 0;
             }
@@ -81,18 +93,30 @@ impl PluginSettings {
                 Type: crate::far::api::FST_QWORD,
                 Value: crate::far::api::FarSettingsValueData { Number: 0 },
             };
-            let get_result2 = sctl(sc.Handle, crate::far::api::SCTL_GET, 0, &mut item2 as *mut _ as *mut _);
+            let get_result2 = sctl(
+                sc.Handle,
+                crate::far::api::SCTL_GET,
+                0,
+                &mut item2 as *mut _ as *mut _,
+            );
             if get_result2 != 0 {
                 settings.unpack_style = match item2.Value.Number {
                     0 => UnpackStyle::Raw,
                     1 => UnpackStyle::FullParse,
                     2 => UnpackStyle::V8Unpack,
-                    3 => UnpackStyle::Saby,
+                    3 => UnpackStyle::Json,
+                    4 => UnpackStyle::Edt,
+                    5 => UnpackStyle::Configurator,
                     _ => UnpackStyle::default(),
                 };
             }
 
-            sctl(sc.Handle, crate::far::api::SCTL_FREE, 0, std::ptr::null_mut());
+            sctl(
+                sc.Handle,
+                crate::far::api::SCTL_FREE,
+                0,
+                std::ptr::null_mut(),
+            );
         }
         settings
     }
@@ -124,7 +148,12 @@ impl PluginSettings {
                 Guid: crate::far::PLUGIN_GUID,
                 Handle: invalid_handle,
             };
-            let create_result = sctl(invalid_handle, crate::far::api::SCTL_CREATE, 0, &mut sc as *mut _ as *mut _);
+            let create_result = sctl(
+                invalid_handle,
+                crate::far::api::SCTL_CREATE,
+                0,
+                &mut sc as *mut _ as *mut _,
+            );
             if create_result == 0 {
                 return;
             }
@@ -136,9 +165,16 @@ impl PluginSettings {
                 Root: 0,
                 Name: name_cb.as_ptr(),
                 Type: crate::far::api::FST_QWORD,
-                Value: crate::far::api::FarSettingsValueData { Number: if self.create_backup { 1 } else { 0 } },
+                Value: crate::far::api::FarSettingsValueData {
+                    Number: if self.create_backup { 1 } else { 0 },
+                },
             };
-            sctl(sc.Handle, crate::far::api::SCTL_SET, 0, &mut item as *mut _ as *mut _);
+            sctl(
+                sc.Handle,
+                crate::far::api::SCTL_SET,
+                0,
+                &mut item as *mut _ as *mut _,
+            );
 
             // Write UnpackStyle (QWORD)
             let name_us = crate::far::string_utils::to_wide("UnpackStyle");
@@ -147,11 +183,23 @@ impl PluginSettings {
                 Root: 0,
                 Name: name_us.as_ptr(),
                 Type: crate::far::api::FST_QWORD,
-                Value: crate::far::api::FarSettingsValueData { Number: self.unpack_style as u64 },
+                Value: crate::far::api::FarSettingsValueData {
+                    Number: self.unpack_style as u64,
+                },
             };
-            sctl(sc.Handle, crate::far::api::SCTL_SET, 0, &mut item2 as *mut _ as *mut _);
+            sctl(
+                sc.Handle,
+                crate::far::api::SCTL_SET,
+                0,
+                &mut item2 as *mut _ as *mut _,
+            );
 
-            sctl(sc.Handle, crate::far::api::SCTL_FREE, 0, std::ptr::null_mut());
+            sctl(
+                sc.Handle,
+                crate::far::api::SCTL_FREE,
+                0,
+                std::ptr::null_mut(),
+            );
         }
     }
 
@@ -178,7 +226,10 @@ impl PluginSettings {
         let content = match std::fs::read_to_string(&ini_path) {
             Ok(c) => c,
             Err(e) => {
-                info!("Settings::load (far2): cannot read {}: {}, using defaults", ini_path, e);
+                info!(
+                    "Settings::load (far2): cannot read {}: {}, using defaults",
+                    ini_path, e
+                );
                 return settings;
             }
         };
@@ -206,7 +257,9 @@ impl PluginSettings {
                             0 => UnpackStyle::Raw,
                             1 => UnpackStyle::FullParse,
                             2 => UnpackStyle::V8Unpack,
-                            3 => UnpackStyle::Saby,
+                            3 => UnpackStyle::Json,
+                            4 => UnpackStyle::Edt,
+                            5 => UnpackStyle::Configurator,
                             _ => UnpackStyle::default(),
                         };
                     }

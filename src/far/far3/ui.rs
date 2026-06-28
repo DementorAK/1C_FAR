@@ -37,8 +37,15 @@ pub fn show_progress(title: &str, message: &str, current: usize, total: usize) {
                     bar.push('░');
                 }
 
-                let line1 = crate::far::string_utils::to_wide(&format!("{}: {}", get_msg(Msg::PackingMessage), message));
-                let line2 = crate::far::string_utils::to_wide(&format!("{} {}% ({} / {})", bar, percent, current, total));
+                let line1 = crate::far::string_utils::to_wide(&format!(
+                    "{}: {}",
+                    get_msg(Msg::PackingMessage),
+                    message
+                ));
+                let line2 = crate::far::string_utils::to_wide(&format!(
+                    "{} {}% ({} / {})",
+                    bar, percent, current, total
+                ));
                 let title_wide = crate::far::string_utils::to_wide(title);
 
                 let items = [title_wide.as_ptr(), line1.as_ptr(), line2.as_ptr()];
@@ -88,7 +95,10 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
         let style_raw = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleRaw));
         let style_full = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleFull));
         let style_v8 = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleV8));
-        let style_saby = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleSaby));
+        let style_json = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleJson));
+        let style_edt = crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleEdt));
+        let style_configurator =
+            crate::far::string_utils::to_wide(&get_msg(Msg::UnpackStyleConfigurator));
         let ok_text = crate::far::string_utils::to_wide(&get_msg(Msg::Ok));
         let cancel_text = crate::far::string_utils::to_wide(&get_msg(Msg::Cancel));
 
@@ -99,7 +109,7 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
                 X1: 3,
                 Y1: 1,
                 X2: 60,
-                Y2: 13,
+                Y2: 15,
                 Data: title.as_ptr(),
                 ..Default::default()
             },
@@ -189,16 +199,16 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
                 },
                 ..Default::default()
             },
-            // 7: Radio Saby
+            // 7: Radio Json
             FarDialogItem {
                 Type: DI_RADIOBUTTON,
                 X1: 7,
                 Y1: 8,
                 X2: 0,
                 Y2: 0,
-                Data: style_saby.as_ptr(),
+                Data: style_json.as_ptr(),
                 Param: FarDialogItemParam {
-                    Selected: if settings.unpack_style == UnpackStyle::Saby {
+                    Selected: if settings.unpack_style == UnpackStyle::Json {
                         1
                     } else {
                         0
@@ -206,32 +216,66 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
                 },
                 ..Default::default()
             },
-            // 8: Separator
+            // 8: Radio Edt
+            FarDialogItem {
+                Type: DI_RADIOBUTTON,
+                X1: 7,
+                Y1: 9,
+                X2: 0,
+                Y2: 0,
+                Data: style_edt.as_ptr(),
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::Edt {
+                        1
+                    } else {
+                        0
+                    },
+                },
+                ..Default::default()
+            },
+            // 9: Radio Configurator
+            FarDialogItem {
+                Type: DI_RADIOBUTTON,
+                X1: 7,
+                Y1: 10,
+                X2: 0,
+                Y2: 0,
+                Data: style_configurator.as_ptr(),
+                Param: FarDialogItemParam {
+                    Selected: if settings.unpack_style == UnpackStyle::Configurator {
+                        1
+                    } else {
+                        0
+                    },
+                },
+                ..Default::default()
+            },
+            // 10: Separator
             FarDialogItem {
                 Type: DI_TEXT,
                 X1: 5,
-                Y1: 10,
+                Y1: 12,
                 X2: 0,
                 Y2: 0,
                 Flags: DIF_SEPARATOR,
                 ..Default::default()
             },
-            // 9: OK
+            // 11: OK
             FarDialogItem {
                 Type: DI_BUTTON,
                 X1: 0,
-                Y1: 11,
+                Y1: 13,
                 X2: 0,
                 Y2: 0,
                 Data: ok_text.as_ptr(),
                 Flags: DIF_CENTERGROUP | DIF_DEFAULTBUTTON,
                 ..Default::default()
             },
-            // 10: Cancel
+            // 12: Cancel
             FarDialogItem {
                 Type: DI_BUTTON,
                 X1: 0,
-                Y1: 11,
+                Y1: 13,
                 X2: 0,
                 Y2: 0,
                 Data: cancel_text.as_ptr(),
@@ -246,7 +290,7 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             -1,
             -1,
             64,
-            15,
+            17,
             ptr::null(),
             items.as_ptr(),
             items.len(),
@@ -261,7 +305,7 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
         }
 
         let ret = dr(h_dlg);
-        if ret == 9 {
+        if ret == 11 {
             // OK button index
             let mut new_settings = PluginSettings {
                 create_backup: sc(h_dlg, DM_GETCHECK as IntPtr, 1, ptr::null_mut()) != 0,
@@ -275,7 +319,11 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             } else if sc(h_dlg, DM_GETCHECK as IntPtr, 6, ptr::null_mut()) != 0 {
                 new_settings.unpack_style = UnpackStyle::V8Unpack;
             } else if sc(h_dlg, DM_GETCHECK as IntPtr, 7, ptr::null_mut()) != 0 {
-                new_settings.unpack_style = UnpackStyle::Saby;
+                new_settings.unpack_style = UnpackStyle::Json;
+            } else if sc(h_dlg, DM_GETCHECK as IntPtr, 8, ptr::null_mut()) != 0 {
+                new_settings.unpack_style = UnpackStyle::Edt;
+            } else if sc(h_dlg, DM_GETCHECK as IntPtr, 9, ptr::null_mut()) != 0 {
+                new_settings.unpack_style = UnpackStyle::Configurator;
             }
 
             df(h_dlg);

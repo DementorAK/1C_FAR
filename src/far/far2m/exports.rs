@@ -5,11 +5,8 @@ use crate::far::lang::{get_msg, Msg};
 use crate::far::panels::{FileType, PluginPanel};
 use crate::far::string_utils::to_wide;
 
-
 use log::info;
-use std::collections::HashMap;
 use std::ffi::c_void;
-use std::fs::File;
 use std::panic;
 use std::ptr;
 
@@ -55,18 +52,20 @@ pub unsafe extern "system" fn SetStartupInfoW(info: *const PluginStartupInfo) {
     let _ = std::panic::catch_unwind(|| {
         if !info.is_null() {
             crate::far::STARTUP_INFO = Some(*info);
-            
+
             // Initialize logging backend
             #[cfg(not(target_os = "windows"))]
             let _ = simple_logger::init();
-            
+
             let module_name_ptr = (*info).ModuleName;
             let _root_key_ptr = (*info).RootKey;
 
             if !module_name_ptr.is_null() {
                 let module_name = crate::far::string_utils::from_wide_ptr(module_name_ptr);
                 // far2m: save config.ini in plugin's working directory
-                let plugin_dir = std::path::Path::new(&module_name).parent().unwrap_or(std::path::Path::new(""));
+                let plugin_dir = std::path::Path::new(&module_name)
+                    .parent()
+                    .unwrap_or(std::path::Path::new(""));
                 let ini_path = plugin_dir.join("config.ini").to_string_lossy().to_string();
 
                 info!("Settings ini path: {}", ini_path);
@@ -84,33 +83,25 @@ pub unsafe extern "system" fn SetStartupInfoW(info: *const PluginStartupInfo) {
 #[no_mangle]
 pub unsafe extern "C" fn GetPluginInfoW(info: *mut PluginInfo) {
     let _ = panic::catch_unwind(|| {
-
         if info.is_null() {
             return;
         }
-        
+
         let p_info = &mut *info;
-        
+
         // Zero the entire buffer first. We use the size of our struct.
         // It's 88 bytes with the newly added GUIDs.
         let total_size = std::mem::size_of::<PluginInfo>();
         std::ptr::write_bytes(info as *mut u8, 0, total_size);
 
         // Prepare strings
-        let menu_string = Box::leak(
-            to_wide(&get_msg(Msg::PluginTitle)).into_boxed_slice(),
-        )
-        .as_ptr();
+        let menu_string =
+            Box::leak(to_wide(&get_msg(Msg::PluginTitle)).into_boxed_slice()).as_ptr();
         let menu_strings_arr = Box::leak(Box::new([menu_string]));
-        let config_string = Box::leak(
-            to_wide(&get_msg(Msg::SettingsTitle)).into_boxed_slice(),
-        )
-        .as_ptr();
+        let config_string =
+            Box::leak(to_wide(&get_msg(Msg::SettingsTitle)).into_boxed_slice()).as_ptr();
         let config_strings_arr = Box::leak(Box::new([config_string]));
-        let prefix = Box::leak(
-            to_wide(env!("PLUGIN_PREFIX")).into_boxed_slice(),
-        )
-        .as_ptr();
+        let prefix = Box::leak(to_wide(env!("PLUGIN_PREFIX")).into_boxed_slice()).as_ptr();
 
         p_info.StructSize = total_size as i32;
         p_info.Flags = 0;
@@ -197,18 +188,13 @@ pub unsafe extern "C" fn GetOpenPluginInfoW(h_plugin: HANDLE, info: *mut OpenPlu
         let panel = &*(h_plugin as *const PluginPanel);
         let title = panel.panel_title();
 
-        let panel_title_ptr = Box::leak(
-            crate::far::string_utils::to_wide(&title).into_boxed_slice(),
-        )
-        .as_ptr();
-        let cur_dir_ptr = Box::leak(
-            crate::far::string_utils::to_wide(&panel.cur_dir_str()).into_boxed_slice(),
-        )
-        .as_ptr();
-        let format_ptr = Box::leak(
-            crate::far::string_utils::to_wide("1C").into_boxed_slice(),
-        )
-        .as_ptr();
+        let panel_title_ptr =
+            Box::leak(crate::far::string_utils::to_wide(&title).into_boxed_slice()).as_ptr();
+        let cur_dir_ptr =
+            Box::leak(crate::far::string_utils::to_wide(&panel.cur_dir_str()).into_boxed_slice())
+                .as_ptr();
+        let format_ptr =
+            Box::leak(crate::far::string_utils::to_wide("1C").into_boxed_slice()).as_ptr();
 
         p_info.StructSize = total_size as i32;
         p_info.Flags = OPIF_USEFILTER | OPIF_ADDDOTS | OPIF_RAWSELECTION;
@@ -275,8 +261,10 @@ pub unsafe extern "C" fn FreeFindDataW(
 ) {
     let _ = panic::catch_unwind(|| {
         if !_panel_item.is_null() && _items_number > 0 {
-            let slice_ptr =
-                std::ptr::slice_from_raw_parts_mut(_panel_item as *mut PluginPanelItem, _items_number as usize);
+            let slice_ptr = std::ptr::slice_from_raw_parts_mut(
+                _panel_item as *mut PluginPanelItem,
+                _items_number as usize,
+            );
             let _items = Box::from_raw(slice_ptr);
         }
     });
@@ -290,9 +278,9 @@ pub unsafe extern "C" fn SetDirectoryW(h_plugin: HANDLE, dir: *const u32, _op_mo
         }
         let panel = &mut *(h_plugin as *mut PluginPanel);
         let dir_str = crate::far::string_utils::from_wide_ptr(dir);
-        if panel.set_directory(&dir_str) { 
-            1 
-        } else { 
+        if panel.set_directory(&dir_str) {
+            1
+        } else {
             if dir_str == ".." || dir_str == "\\" || dir_str == "/" || dir_str.is_empty() {
                 if let Some(api) = crate::far::STARTUP_INFO {
                     if let Some(control) = api.Control {
@@ -300,7 +288,7 @@ pub unsafe extern "C" fn SetDirectoryW(h_plugin: HANDLE, dir: *const u32, _op_mo
                     }
                 }
             }
-            0 
+            0
         }
     })
     .unwrap_or(0)
@@ -333,12 +321,16 @@ pub unsafe extern "C" fn GetFilesW(
 
         for item in items {
             let mut nlen = 0;
-            while !item.FindData.lpwszFileName.is_null() && *item.FindData.lpwszFileName.offset(nlen) != 0 {
+            while !item.FindData.lpwszFileName.is_null()
+                && *item.FindData.lpwszFileName.offset(nlen) != 0
+            {
                 nlen += 1;
             }
-            let name_wide =
-                std::slice::from_raw_parts(item.FindData.lpwszFileName, nlen as usize);
-            let name: String = name_wide.iter().filter_map(|&c| char::from_u32(c)).collect();
+            let name_wide = std::slice::from_raw_parts(item.FindData.lpwszFileName, nlen as usize);
+            let name: String = name_wide
+                .iter()
+                .filter_map(|&c| char::from_u32(c))
+                .collect();
 
             if let Some(entry) = panel.find_entry_in_current_dir(&name) {
                 let dest_item_path = dest_base.join(&name);
@@ -374,12 +366,16 @@ pub unsafe extern "C" fn PutFilesW(
 
         for item in items {
             let mut nlen = 0;
-            while !item.FindData.lpwszFileName.is_null() && *item.FindData.lpwszFileName.offset(nlen) != 0 {
+            while !item.FindData.lpwszFileName.is_null()
+                && *item.FindData.lpwszFileName.offset(nlen) != 0
+            {
                 nlen += 1;
             }
-            let name_wide =
-                std::slice::from_raw_parts(item.FindData.lpwszFileName, nlen as usize);
-            let name: String = name_wide.iter().filter_map(|&c| char::from_u32(c)).collect();
+            let name_wide = std::slice::from_raw_parts(item.FindData.lpwszFileName, nlen as usize);
+            let name: String = name_wide
+                .iter()
+                .filter_map(|&c| char::from_u32(c))
+                .collect();
 
             let src_file_path = std::path::Path::new(&src_path_str).join(&name);
             if let Ok(new_data) = std::fs::read(&src_file_path) {
@@ -413,7 +409,7 @@ pub unsafe extern "C" fn ProcessEventW(h_plugin: HANDLE, event: i32, _param: *mu
             return 0;
         }
         let panel = &mut *(h_plugin as *mut PluginPanel);
-        
+
         // FE_CLOSE == 3
         if event == 3 && panel.is_modified {
             let msg_title = to_wide(&get_msg(Msg::SavingTitle));
@@ -455,7 +451,8 @@ pub unsafe extern "C" fn ProcessEventW(h_plugin: HANDLE, event: i32, _param: *mu
             }
         }
         0
-    }).unwrap_or(0)
+    })
+    .unwrap_or(0)
 }
 
 #[no_mangle]
@@ -494,9 +491,6 @@ pub unsafe extern "C" fn ExitFARW() {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 unsafe fn open_artifact_panel(path: &str) -> HANDLE {
-    use crate::base::reader::FileReader;
-    use crate::v8::vfs_builder::build_vfs;
-
     let file_type = match FileType::from_extension(
         std::path::Path::new(path)
             .extension()
@@ -509,30 +503,12 @@ unsafe fn open_artifact_panel(path: &str) -> HANDLE {
 
     let mut panel = PluginPanel::new(path.to_string(), file_type);
 
-    if let Ok(file) = File::open(&panel.path) {
-        if let Ok(mut reader) = FileReader::new(file) {
-            if let Ok(header) = crate::v8::container::read_image_header(&mut reader, 0) {
-                panel.page_size = header.page_size;
-                panel.is_64bit = header.header_size == 20;
-            }
-            if let Ok(rows) = crate::v8::container::read_container_rows(reader, 0) {
-                let mut rows_map = HashMap::new();
-                let mut packed_map = HashMap::new();
-                for (id, (data, packed)) in rows {
-                    rows_map.insert(id.clone(), data);
-                    packed_map.insert(id, packed);
-                }
-                if let Ok(vfs) = build_vfs(&rows_map) {
-                    panel.vfs = vfs;
-                    panel.rows_map = rows_map;
-                    panel.packed_map = packed_map;
-                }
-            }
-        }
+    if panel.load_container().is_ok() {
+        info!("Opened artifact: {}", path);
+        Box::into_raw(Box::new(panel)) as HANDLE
+    } else {
+        ptr::null_mut()
     }
-
-    info!("Opened artifact: {}", path);
-    Box::into_raw(Box::new(panel)) as HANDLE
 }
 
 unsafe fn get_current_panel_path() -> Option<String> {
@@ -541,7 +517,12 @@ unsafe fn get_current_panel_path() -> Option<String> {
 
     // Get current panel directory
     let mut dir_buf = vec![0u32; 4096];
-    let dir_len = control(PANEL_ACTIVE, FCTL_GETPANELDIR, 4096, dir_buf.as_mut_ptr() as IntPtr);
+    let dir_len = control(
+        PANEL_ACTIVE,
+        FCTL_GETPANELDIR,
+        4096,
+        dir_buf.as_mut_ptr() as IntPtr,
+    );
     if dir_len <= 0 {
         return None;
     }
