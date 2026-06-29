@@ -207,6 +207,8 @@ macro_rules! wstr {
     };
 }
 
+/// # Safety
+/// The `ptr` must be a valid pointer to a null-terminated string of `WCHAR` elements.
 pub unsafe fn from_wide_ptr(ptr: *const WCHAR) -> String {
     crate::far::string_utils::from_wide_ptr(ptr)
 }

@@ -251,10 +251,7 @@ pub unsafe extern "C" fn FreeFindDataW(
 ) {
     let _ = panic::catch_unwind(|| {
         if !_panel_item.is_null() && _items_number > 0 {
-            let slice_ptr = std::ptr::slice_from_raw_parts_mut(
-                _panel_item as *mut PluginPanelItem,
-                _items_number as usize,
-            );
+            let slice_ptr = std::ptr::slice_from_raw_parts_mut(_panel_item, _items_number as usize);
             let _items = Box::from_raw(slice_ptr);
         }
     });

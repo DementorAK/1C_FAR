@@ -612,24 +612,85 @@ fn is_configuration_format(rows_map: &HashMap<String, Vec<u8>>, root_uuid: &str)
     group_count >= 1 // CF has at least one top-level group or Reports
 }
 
-/// Build VFS tree for any 1C container (EPF/ERF/CF/CFE).
 impl PresentationStyle for JsonStyle {
     fn build_vfs(
         &self,
         rows_map: &HashMap<String, Vec<u8>>,
     ) -> Result<Vec<VfsEntry>, BuildVfsError> {
-        // CFE detection: has "configinfo" but no "root"
-        if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
-            return build_extension_vfs(rows_map);
-        }
-
-        let (root_uuid, _root_parser) = parse_root(rows_map)?;
-
-        if is_configuration_format(rows_map, &root_uuid) {
-            build_configuration_vfs(rows_map, &root_uuid)
+        // Build base VFS tree
+        let mut vfs = if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
+            build_extension_vfs(rows_map)?
         } else {
-            build_single_object_vfs(rows_map, &root_uuid)
+            let (root_uuid, _root_parser) = parse_root(rows_map)?;
+            if is_configuration_format(rows_map, &root_uuid) {
+                build_configuration_vfs(rows_map, &root_uuid)?
+            } else {
+                build_single_object_vfs(rows_map, &root_uuid)?
+            }
+        };
+
+        // Track used IDs
+        let mut used_ids = std::collections::HashSet::new();
+        fn collect_used(entries: &[VfsEntry], used: &mut std::collections::HashSet<String>) {
+            for e in entries {
+                match e {
+                    VfsEntry::File {
+                        origin_row_id: Some(id),
+                        ..
+                    } => {
+                        used.insert(id.clone());
+                    }
+                    VfsEntry::Dir {
+                        origin_row_id: Some(id),
+                        children,
+                        ..
+                    } => {
+                        used.insert(id.clone());
+                        collect_used(children, used);
+                    }
+                    VfsEntry::Dir { children, .. } => {
+                        collect_used(children, used);
+                    }
+                    _ => {}
+                }
+            }
         }
+        collect_used(&vfs, &mut used_ids);
+
+        // Build index.json from remaining strings
+        let mut index_obj = serde_json::Map::new();
+        for (id, data) in rows_map {
+            if !used_ids.contains(id) {
+                // If it's a bracket struct, convert to JSON
+                if let Ok(json_val) = crate::base::bracket_json::parse_bracket_to_json(data) {
+                    index_obj.insert(id.clone(), json_val);
+                } else {
+                    // It's binary (or just text we can't parse), store as raw file
+                    vfs.push(VfsEntry::File {
+                        name: format!("{}.raw", id),
+                        data: data.clone(),
+                        is_protected: false,
+                        origin_row_id: Some(id.clone()),
+                        original_container: None,
+                    });
+                }
+            }
+        }
+
+        if !index_obj.is_empty() {
+            let index_val = serde_json::Value::Object(index_obj);
+            if let Ok(index_data) = serde_json::to_vec_pretty(&index_val) {
+                vfs.push(VfsEntry::File {
+                    name: "index.json".to_string(),
+                    data: index_data,
+                    is_protected: false,
+                    origin_row_id: None,
+                    original_container: None,
+                });
+            }
+        }
+
+        Ok(vfs)
     }
 
     fn sync_vfs_to_rows(&self, vfs: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>>) {
@@ -734,12 +795,25 @@ pub fn sync_nodes_to_map_json(entries: &[VfsEntry], updates: &mut HashMap<String
     for entry in entries {
         match entry {
             VfsEntry::File {
+                name,
                 data,
                 origin_row_id,
                 original_container,
                 ..
             } => {
-                if let Some(row_id) = origin_row_id {
+                if name == "index.json" {
+                    if let Ok(json_val) = serde_json::from_slice::<serde_json::Value>(data) {
+                        if let Some(obj) = json_val.as_object() {
+                            for (k, v) in obj {
+                                if let Ok(bracket_bytes) =
+                                    crate::base::bracket_json::serialize_json_to_bracket(v)
+                                {
+                                    updates.insert(k.clone(), bracket_bytes);
+                                }
+                            }
+                        }
+                    }
+                } else if let Some(row_id) = origin_row_id {
                     let mut final_data = data.clone();
                     if let Some(orig_cont) = original_container {
                         // Smart re-wrap: use original container as template
