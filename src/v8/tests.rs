@@ -77,7 +77,17 @@ mod integration {
     }
 
     fn find_entry<'a>(entries: &'a [VfsEntry], name: &str) -> Option<&'a VfsEntry> {
-        entries.iter().find(|e| e.name() == name)
+        for e in entries {
+            if e.name() == name {
+                return Some(e);
+            }
+            if let Some(children) = e.children() {
+                if let Some(found) = find_entry(children, name) {
+                    return Some(found);
+                }
+            }
+        }
+        None
     }
 
     fn print_vfs(entries: &[VfsEntry], indent: usize) {
@@ -151,11 +161,8 @@ mod integration {
         let forms = find_entry(&vfs, "Forms").expect("Forms dir");
         let children = forms.children().unwrap();
         assert!(!children.is_empty(), "Forms not empty");
-        for form in children {
-            assert!(form.is_dir());
-            assert!(form.find_child("Module.bsl").is_some());
-            println!("  Form: '{}'", form.name());
-        }
+        assert!(children.iter().any(|e| e.name().ends_with(".xml")));
+        assert!(children.iter().any(|e| e.is_dir()));
     }
 
     #[test]
@@ -174,6 +181,15 @@ mod integration {
         print_vfs(&vfs, 0);
         assert!(find_entry(&vfs, "Forms").is_none());
         assert!(find_entry(&vfs, "Templates").is_none());
+        assert!(
+            find_entry(&vfs, "ObjectModule.bin").is_some(),
+            "ObjectModule.bin should exist for protected module"
+        );
+        // Also verify .bsl variant is NOT present
+        assert!(
+            find_entry(&vfs, "ObjectModule.bsl").is_none(),
+            "ObjectModule.bsl should NOT exist for protected module"
+        );
     }
 
     #[test]

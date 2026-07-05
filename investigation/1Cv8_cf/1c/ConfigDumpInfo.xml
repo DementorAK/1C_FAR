@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ConfigDumpInfo xmlns="http://v8.1c.ru/8.3/xcf/dumpinfo" xmlns:xen="http://v8.1c.ru/8.3/xcf/enums" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" format="Hierarchical" version="2.21">
+	<ConfigVersions>
+		<Metadata name="Configuration.TestConfiguration" id="7f84e2f0-2375-4fbe-91f5-2d6247619891" configVersion="2622213a74d58343b61d505be4aa2acc00000000"/>
+		<Metadata name="Configuration.TestConfiguration.ParentConfigurations" id="58829915-59ff-496b-abba-bb14baf9c01f.4" configVersion="a24379f7fb68c843beebbfbd01eb9ddf00000000"/>
+		<Metadata name="DataProcessor.protected" id="a4add16e-5658-45b8-b142-4a67f104a3ea" configVersion="72d9fed5da967745946f026981effa7100000000"/>
+		<Metadata name="DataProcessor.protected.ObjectModule" id="a4add16e-5658-45b8-b142-4a67f104a3ea.0" configVersion="4ed234ee1563834080136efdc7ee947a00000000"/>
+		<Metadata name="DataProcessor.simple" id="8ffdac5d-62f6-481d-a00b-ea6bf6565b54" configVersion="dea049dd00a11e4faf20386185cf31fb00000000"/>
+		<Metadata name="DataProcessor.with_form" id="bcea0da1-ee20-451e-9493-1df5f99cfe8c" configVersion="5ccaf0973a44bf4cad9842d4073b923800000000">
+			<Metadata name="DataProcessor.with_form.Attribute.Attr_1" id="177864cb-24a9-40d3-b214-952693d70b98"/>
+		</Metadata>
+		<Metadata name="DataProcessor.with_form.Form.Форма" id="5c82f8fd-6f54-4bdf-ab39-90e27c1690ca" configVersion="3f9f27f7654b3f488cdbff1a99208b0600000000"/>
+		<Metadata name="DataProcessor.with_form.Form.Форма.Form" id="5c82f8fd-6f54-4bdf-ab39-90e27c1690ca.0" configVersion="ecfd09f7ad38cd45b285ba04d7b1af0600000000"/>
+		<Metadata name="DataProcessor.with_module" id="5850e632-cc75-4860-ae0c-a854edefded3" configVersion="4b91783534f75c43a13952e464ef80a200000000"/>
+		<Metadata name="DataProcessor.with_module.ObjectModule" id="5850e632-cc75-4860-ae0c-a854edefded3.0" configVersion="6b88194685b2024d97336589d86e30f100000000"/>
+		<Metadata name="Language.English" id="b5404906-03b6-4553-879b-d01560ceb8ec" configVersion="63307fd52cd65b4ab550e75c5c8f35f800000000"/>
+		<Metadata name="Report.simple" id="eb00f494-7b2c-4ebb-a9c4-1259d7d799d6" configVersion="5eb88ea424d1f045ba1169987d20dd1c00000000"/>
+		<Metadata name="Report.simple.Form.ФормаОтчета" id="342d4708-8a8a-4625-96f2-0b3a122aea4e" configVersion="33357fb602c1d649a7442a2f637c8a9a00000000"/>
+		<Metadata name="Report.simple.Form.ФормаОтчета.Form" id="342d4708-8a8a-4625-96f2-0b3a122aea4e.0" configVersion="b4e55ce326c3244c97aee82eb62ba43300000000"/>
+		<Metadata name="Report.simple.Template.ОсновнаяСхемаКомпоновкиДанных" id="b81ccc3d-1a0f-4605-8842-01f2f979f404" configVersion="f0723f95cc5adc42a0f852047d8a7a5600000000"/>
+		<Metadata name="Report.simple.Template.ОсновнаяСхемаКомпоновкиДанных.Template" id="b81ccc3d-1a0f-4605-8842-01f2f979f404.0" configVersion="09d7dc9598f26c4d973bc25fcfff22bb00000000"/>
+	</ConfigVersions>
+</ConfigDumpInfo>

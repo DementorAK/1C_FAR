@@ -46,7 +46,7 @@ fn extract_module_text(data: &[u8]) -> Option<(Vec<u8>, Option<Vec<u8>>)> {
                         }
                     }
                 }
-                return None;
+                // SIG match but no "text" row — treat as raw data (e.g. protected module bytecode)
             }
         }
     }
@@ -251,66 +251,115 @@ fn build_subordinate_entries(
                 .and_then(|d| extract_item_name(d))
                 .unwrap_or_else(|| short_uuid(inst_uuid));
 
+            // Generate metadata xml file
+            if let Some(h) = header {
+                if let Some(xml) = crate::v8::styles::configurator_schema::bracket_to_xml(
+                    &String::from_utf8_lossy(h),
+                    &group.display_name,
+                ) {
+                    children.push(VfsEntry::File {
+                        name: format!("{}.xml", name),
+                        data: xml.into_bytes(),
+                        is_protected: false,
+                        origin_row_id: Some(inst_uuid.clone()),
+                        original_container: None,
+                    });
+                }
+            }
+
             if group.display_name == "Forms" {
-                let (module_data, orig_cont) = body
-                    .and_then(|b| extract_module_text(b))
-                    .unwrap_or((Vec::new(), None));
-                let is_prot = is_protected_module(&module_data);
-                children.push(VfsEntry::Dir {
-                    name,
-                    children: vec![VfsEntry::Dir {
-                        name: "Ext".to_string(),
+                let mut ext_children = Vec::new();
+                if let Some(b) = body {
+                    let (module_data, orig_cont) =
+                        extract_module_text(b).unwrap_or((Vec::new(), None));
+                    let is_prot = is_protected_module(&module_data);
+
+                    if let Some(xml) = crate::v8::styles::configurator_schema::bracket_to_xml(
+                        &String::from_utf8_lossy(b),
+                        "FormLayout",
+                    ) {
+                        ext_children.push(VfsEntry::File {
+                            name: "Form.xml".to_string(),
+                            data: xml.into_bytes(),
+                            is_protected: false,
+                            origin_row_id: Some(body_key.clone()),
+                            original_container: orig_cont.clone(),
+                        });
+                    }
+
+                    if has_real_content(&module_data) && orig_cont.is_some() {
+                        ext_children.push(VfsEntry::File {
+                            name: "Module.bsl".to_string(),
+                            data: module_data,
+                            is_protected: is_prot,
+                            origin_row_id: Some(body_key.clone()),
+                            original_container: orig_cont,
+                        });
+                    }
+                }
+                if !ext_children.is_empty() {
+                    children.push(VfsEntry::Dir {
+                        name: name.clone(),
                         children: vec![VfsEntry::Dir {
-                            name: "Form".to_string(),
+                            name: "Ext".to_string(),
+                            children: ext_children,
+                            origin_row_id: None,
+                        }],
+                        origin_row_id: None,
+                    });
+                }
+            } else if group.display_name == "Templates" {
+                if let Some(b) = body {
+                    let mut ext_children = Vec::new();
+                    if let Some(xml) = crate::v8::styles::configurator_schema::bracket_to_xml(
+                        &String::from_utf8_lossy(b),
+                        "TemplateLayout",
+                    ) {
+                        ext_children.push(VfsEntry::File {
+                            name: "Template.xml".to_string(),
+                            data: xml.into_bytes(),
+                            is_protected: false,
+                            origin_row_id: Some(body_key.clone()),
+                            original_container: None,
+                        });
+                    } else {
+                        ext_children.push(VfsEntry::File {
+                            name: "Template.bin".to_string(),
+                            data: b.clone(),
+                            is_protected: false,
+                            origin_row_id: Some(body_key.clone()),
+                            original_container: None,
+                        });
+                    }
+                    children.push(VfsEntry::Dir {
+                        name: name.clone(),
+                        children: vec![VfsEntry::Dir {
+                            name: "Ext".to_string(),
+                            children: ext_children,
+                            origin_row_id: None,
+                        }],
+                        origin_row_id: None,
+                    });
+                }
+            } else {
+                let data = body.cloned().unwrap_or_default();
+                if !data.is_empty() {
+                    children.push(VfsEntry::Dir {
+                        name: name.clone(),
+                        children: vec![VfsEntry::Dir {
+                            name: "Ext".to_string(),
                             children: vec![VfsEntry::File {
                                 name: "Module.bsl".to_string(),
-                                data: module_data,
-                                is_protected: is_prot,
+                                data,
+                                is_protected: false,
                                 origin_row_id: Some(body_key.clone()),
-                                original_container: orig_cont,
+                                original_container: None,
                             }],
                             origin_row_id: None,
                         }],
                         origin_row_id: None,
-                    }],
-                    origin_row_id: Some(inst_uuid.clone()),
-                });
-            } else if group.display_name == "Templates" {
-                // Template: file with raw data
-                let data = body.cloned().unwrap_or_default();
-                children.push(VfsEntry::Dir {
-                    name,
-                    children: vec![VfsEntry::Dir {
-                        name: "Ext".to_string(),
-                        children: vec![VfsEntry::File {
-                            name: "Template.bin".to_string(),
-                            data,
-                            is_protected: false,
-                            origin_row_id: Some(body_key.clone()),
-                            original_container: None,
-                        }],
-                        origin_row_id: None,
-                    }],
-                    origin_row_id: Some(inst_uuid.clone()),
-                });
-            } else {
-                // Other subordinate types: show as file/dir depending on body presence
-                let data = body.cloned().unwrap_or_default();
-                children.push(VfsEntry::Dir {
-                    name,
-                    children: vec![VfsEntry::Dir {
-                        name: "Ext".to_string(),
-                        children: vec![VfsEntry::File {
-                            name: "Module.bsl".to_string(),
-                            data,
-                            is_protected: false,
-                            origin_row_id: Some(body_key.clone()),
-                            original_container: None,
-                        }],
-                        origin_row_id: None,
-                    }],
-                    origin_row_id: Some(inst_uuid.clone()),
-                });
+                    });
+                }
             }
         }
 
@@ -343,29 +392,87 @@ fn build_single_object_vfs(
 ) -> Result<Vec<VfsEntry>, BuildVfsError> {
     let root_obj = parse_object(rows_map, root_uuid)?;
     let mut vfs = Vec::new();
+    let mut obj_children = Vec::new();
 
-    // ObjectModule.bsl from [3][1][1][3][1][1][2] тЖТ {uuid}.0
+    let obj_name = extract_object_name(rows_map, root_uuid);
+
+    // Enumerate subordinates from [3][1], starting at index 3
+    let groups = enumerate_subordinates(&root_obj, &[3, 1], 3);
+
+    let mut child_refs = Vec::new();
+    for group in &groups {
+        if let Some(elem_type) = crate::v8::styles::configurator_schema::group_to_element_type(&group.display_name) {
+            for inst_uuid in &group.instance_uuids {
+                let header = rows_map.get(inst_uuid);
+                let name = header
+                    .and_then(|d| extract_item_name(d))
+                    .unwrap_or_else(|| short_uuid(inst_uuid));
+                child_refs.push(crate::v8::styles::configurator_schema::ChildObjectRef {
+                    element_type: elem_type.to_string(),
+                    name,
+                });
+            }
+        }
+    }
+
+    // Create root XML file
+    if let Some(root_data) = rows_map.get(root_uuid) {
+        if let Some(xml_data) = crate::v8::styles::configurator_schema::bracket_to_xml_with_children(
+            &String::from_utf8_lossy(root_data),
+            "ExternalDataProcessor", // Or Report depending on ClassId, simplified for now
+            &child_refs,
+        ) {
+            vfs.push(VfsEntry::File {
+                name: format!("{}.xml", obj_name),
+                data: xml_data.into_bytes(),
+                is_protected: false,
+                origin_row_id: Some(root_uuid.to_string()),
+                original_container: None,
+            });
+        }
+    }
+
+    // ObjectModule.bsl — try multiple paths to find module UUID
     let module_uuid = root_obj
         .get_leaf(&[3, 1, 1, 3, 1, 1, 2])
-        .map(|s| s.to_string());
+        .map(|s| s.to_string())
+        .or_else(|| root_obj.get_leaf(&[1, 3, 1, 1, 2]).map(|s| s.to_string()))
+        .or_else(|| {
+            root_obj
+                .get_leaf(&[3, 1, 1, 1, 3, 1, 1, 2])
+                .map(|s| s.to_string())
+        })
+        .or_else(|| {
+            // Search for body-only rows (.0 suffix) that have no matching header row,
+            // excluding the root UUID's own body
+            rows_map.keys().find_map(|k| {
+                if k.ends_with(".0") {
+                    let base = k.trim_end_matches(".0");
+                    if base != root_uuid && !rows_map.contains_key(base) {
+                        return Some(base.to_string());
+                    }
+                }
+                None
+            })
+        });
     let body_data = module_uuid
         .as_ref()
-        .and_then(|u| rows_map.get(&format!("{}.0", u)))
-        .or_else(|| rows_map.get(&format!("{}.0", root_uuid)));
+        .and_then(|u| rows_map.get(&format!("{}.0", u)));
 
     if let Some(body) = body_data {
         if let Some((text, orig_cont)) = extract_module_text(body) {
             if has_real_content(&text) {
-                vfs.push(VfsEntry::Dir {
+                obj_children.push(VfsEntry::Dir {
                     name: "Ext".to_string(),
                     children: vec![VfsEntry::File {
-                        name: "ObjectModule.bsl".to_string(),
+                        name: if is_protected_module(&text) {
+                            "ObjectModule.bin".to_string()
+                        } else {
+                            "ObjectModule.bsl".to_string()
+                        },
                         is_protected: is_protected_module(&text),
                         data: text,
-                        origin_row_id: module_uuid
-                            .clone()
-                            .map(|u| format!("{}.0", u))
-                            .or_else(|| Some(format!("{}.0", root_uuid))),
+                        origin_row_id: module_uuid.clone().map(|u| format!("{}.0", u)),
                         original_container: orig_cont,
                     }],
                     origin_row_id: None,
@@ -374,9 +481,16 @@ fn build_single_object_vfs(
         }
     }
 
-    // Enumerate subordinates from [3][1], starting at index 3
-    let groups = enumerate_subordinates(&root_obj, &[3, 1], 3);
-    vfs.extend(build_subordinate_entries(rows_map, &groups));
+    obj_children.extend(build_subordinate_entries(rows_map, &groups));
+
+    // Put everything inside <obj_name> folder except root XML
+    if !obj_children.is_empty() {
+        vfs.push(VfsEntry::Dir {
+            name: obj_name.clone(),
+            children: obj_children,
+            origin_row_id: None,
+        });
+    }
 
     // Fallback: if VFS empty, show raw non-utility rows
     if vfs.is_empty() {
@@ -544,6 +658,21 @@ fn build_configuration_vfs(
     let root_obj = parse_object(rows_map, root_uuid)?;
     let mut vfs = Vec::new();
 
+    if let Some(root_data) = rows_map.get(root_uuid) {
+        if let Some(xml) = crate::v8::styles::configurator_schema::bracket_to_xml(
+            &String::from_utf8_lossy(root_data),
+            "Configuration",
+        ) {
+            vfs.push(VfsEntry::File {
+                name: "Configuration.xml".to_string(),
+                data: xml.into_bytes(),
+                is_protected: false,
+                origin_row_id: Some(root_uuid.to_string()),
+                original_container: None,
+            });
+        }
+    }
+
     // CF root object: each top-level element [N] is either:
     //   - A metadata group: {group_uuid, {details...}} where group_uuid is a MetaDataGroup
     //   - Or a branch with subordinate type listings
@@ -555,15 +684,10 @@ fn build_configuration_vfs(
     let root_len = root_obj.branch_len(&[]).unwrap_or(0);
 
     for idx in 0..root_len {
-        // Check if [idx][0] is a metadata group UUID
         let group_uuid = root_obj.get_leaf(&[idx, 0]);
 
         if let Some(group_uuid) = group_uuid {
             if uuids::is_metadata_group(group_uuid) {
-                // Enumerate object types in this group.
-                // Different groups use different nesting:
-                //   General: types at [idx][1][N] for N >= 3
-                //   Main:    types at [idx][1][1][N] for N >= 3
                 let mut groups = enumerate_subordinates(&root_obj, &[idx, 1], 3);
                 let deeper = enumerate_subordinates(&root_obj, &[idx, 1, 1], 3);
                 groups.extend(deeper);
@@ -650,7 +774,7 @@ impl PresentationStyle for ConfiguratorStyle {
         rows_map: &HashMap<String, Vec<u8>>,
     ) -> Result<Vec<VfsEntry>, BuildVfsError> {
         // Build base VFS tree
-        let mut vfs = if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
+        let vfs = if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
             build_extension_vfs(rows_map)?
         } else {
             let (root_uuid, _root_parser) = parse_root(rows_map)?;
@@ -660,71 +784,6 @@ impl PresentationStyle for ConfiguratorStyle {
                 build_single_object_vfs(rows_map, &root_uuid)?
             }
         };
-
-        // Track used IDs
-        let mut used_ids = std::collections::HashSet::new();
-        fn collect_used(entries: &[VfsEntry], used: &mut std::collections::HashSet<String>) {
-            for e in entries {
-                match e {
-                    VfsEntry::File {
-                        origin_row_id: Some(id),
-                        ..
-                    } => {
-                        used.insert(id.clone());
-                    }
-                    VfsEntry::Dir {
-                        origin_row_id: Some(id),
-                        children,
-                        ..
-                    } => {
-                        used.insert(id.clone());
-                        collect_used(children, used);
-                    }
-                    VfsEntry::Dir { children, .. } => {
-                        collect_used(children, used);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        collect_used(&vfs, &mut used_ids);
-
-        // Build index.json from remaining strings
-        let mut index_obj = serde_json::Map::new();
-        for (id, data) in rows_map {
-            if !used_ids.contains(id) {
-                // If it's a bracket struct, convert to JSON
-                if let Ok(json_val) = crate::base::bracket_json::parse_bracket_to_json(data) {
-                    index_obj.insert(id.clone(), json_val);
-                } else {
-                    // It's binary (or just text we can't parse), store as raw file
-                    vfs.push(VfsEntry::File {
-                        name: format!("{}.raw", id),
-                        data: data.clone(),
-                        is_protected: false,
-                        origin_row_id: Some(id.clone()),
-                        original_container: None,
-                    });
-                }
-            }
-        }
-
-        if !index_obj.is_empty() {
-            let index_val = serde_json::Value::Object(index_obj);
-            if let Ok(json_data) = serde_json::to_string(&index_val) {
-                let xml_data = format!(
-                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<MetaDataObject xmlns=\"http://v8.1c.ru/8.3/MDClasses\">\n    <RawData><![CDATA[{}]]></RawData>\n</MetaDataObject>",
-                    json_data
-                );
-                vfs.push(VfsEntry::File {
-                    name: "Configuration.xml".to_string(),
-                    data: xml_data.into_bytes(),
-                    is_protected: false,
-                    origin_row_id: None,
-                    original_container: None,
-                });
-            }
-        }
 
         Ok(vfs)
     }
@@ -806,6 +865,23 @@ fn build_extension_vfs(
         })
         .collect();
 
+    if let Some(ref ext_root_uuid) = root_uuid {
+        if let Some(root_data) = rows_map.get(ext_root_uuid) {
+            if let Some(xml) = crate::v8::styles::configurator_schema::bracket_to_xml(
+                &String::from_utf8_lossy(root_data),
+                "Configuration",
+            ) {
+                vfs.push(VfsEntry::File {
+                    name: "Configuration.xml".to_string(),
+                    data: xml.into_bytes(),
+                    is_protected: false,
+                    origin_row_id: Some(ext_root_uuid.clone()),
+                    original_container: None,
+                });
+            }
+        }
+    }
+
     // Sort groups alphabetically for consistent display
     vfs.sort_by(|a, b| a.name().cmp(b.name()));
 
@@ -840,27 +916,19 @@ pub fn sync_nodes_to_map_configurator(
                 original_container,
                 ..
             } => {
-                if name == "Configuration.xml" {
+                if name.ends_with(".xml") {
                     let xml_str = String::from_utf8_lossy(data);
-                    if let Some(cdata_start) = xml_str.find("<![CDATA[") {
-                        if let Some(cdata_end) = xml_str.find("]]>") {
-                            let json_str = &xml_str[cdata_start + 9..cdata_end];
-                            if let Ok(json_val) =
-                                serde_json::from_str::<serde_json::Value>(json_str)
-                            {
-                                if let Some(obj) = json_val.as_object() {
-                                    for (k, v) in obj {
-                                        if let Ok(bracket_bytes) =
-                                            crate::base::bracket_json::serialize_json_to_bracket(v)
-                                        {
-                                            updates.insert(k.clone(), bracket_bytes);
-                                        }
-                                    }
-                                }
-                            }
+                    if let Some(row_id) = origin_row_id.as_ref() {
+                        if let Some(bracket_bytes) =
+                            crate::v8::styles::configurator_schema::xml_to_bracket(&xml_str)
+                        {
+                            updates.insert(row_id.clone(), bracket_bytes);
                         }
                     }
-                } else if let Some(row_id) = origin_row_id {
+                }
+
+                if !name.ends_with(".xml") && origin_row_id.is_some() {
+                    let row_id = origin_row_id.as_ref().unwrap();
                     let mut final_data = data.clone();
                     if let Some(orig_cont) = original_container {
                         // Smart re-wrap: use original container as template

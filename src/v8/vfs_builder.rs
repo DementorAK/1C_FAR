@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::base::parser::{strip_quotes, StructParser};
 use crate::base::reader::StringReader;
 use crate::v8::container::Container;
@@ -694,18 +695,8 @@ fn is_configuration_format(rows_map: &HashMap<String, Vec<u8>>, root_uuid: &str)
 /// - CF: configuration with multiple top-level metadata groups (has "root" row, multiple groups)
 /// - CFE: extension with flat object list (has "configinfo" row, no "root")
 pub fn build_vfs(rows_map: &HashMap<String, Vec<u8>>) -> Result<Vec<VfsEntry>, BuildVfsError> {
-    // CFE detection: has "configinfo" but no "root"
-    if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
-        return build_extension_vfs(rows_map);
-    }
-
-    let (root_uuid, _root_parser) = parse_root(rows_map)?;
-
-    if is_configuration_format(rows_map, &root_uuid) {
-        build_configuration_vfs(rows_map, &root_uuid)
-    } else {
-        build_single_object_vfs(rows_map, &root_uuid)
-    }
+    use crate::v8::styles::PresentationStyle;
+    crate::v8::styles::configurator::ConfiguratorStyle.build_vfs(rows_map)
 }
 
 /// Build VFS for a CFE (extension) container.

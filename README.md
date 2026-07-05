@@ -21,7 +21,7 @@ A cross-platform plugin for **FAR Manager** / **far2l** that provides transparen
 
 ## Installation
 
-## Supported Platforms
+### Supported Platforms
 
 - **Windows**: Far Manager 3.x (`far3`)
 - **Linux/macOS**: far2l (`far2l`)
@@ -137,11 +137,11 @@ src/
 | Phase 5 | Documentation update V2 | ✅ Complete |
 | Phase 6 | Linux version (build, implementation) | ✅ Complete |
 | Phase 7 | Cross-platform stability (Static Multi-Feature) | ✅ Complete |
-| Phase 8 | Presentation styles implementation (Raw, Full-parse, V8Unpack, Json, EDT, Configurator) | 🔄 In progress |
-| Phase 9 | CF/CFE: metadata hierarchy, cascading rebuild | 🔜 Planned |
-| Phase 10 | Protected modules: bytecode disassembler | 🔜 Planned |
-| Phase 11 | 1CD: file database navigation | 🔜 Planned |
-| Phase 12 | Polish: lazy loading, compatibility testing | 🔜 Planned |
+| Phase 8 | Presentation styles implementation (Raw, Full-parse, V8Unpack, Json, EDT, Configurator) | ✅ Complete |
+| Phase 9 | Artifact parsing fixes: discrepancy reports, display fixes, repacking tests, composition management | 🔄 In progress |
+| Phase 10 | File operations with artifacts: unpack to folder, build from folder, round-trip testing | 🔜 Planned |
+| Phase 11 | Protected modules: bytecode disassembler | 🔜 Planned |
+| Phase 12 | 1CD: file database navigation | 🔜 Planned |
 
 ## Documentation
 

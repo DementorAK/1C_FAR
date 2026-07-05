@@ -46,7 +46,7 @@ fn extract_module_text(data: &[u8]) -> Option<(Vec<u8>, Option<Vec<u8>>)> {
                         }
                     }
                 }
-                return None;
+                // SIG match but no "text" row — treat as raw data (e.g. protected module bytecode)
             }
         }
     }

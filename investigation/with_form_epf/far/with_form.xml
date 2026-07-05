@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MetaDataObject xmlns="http://v8.1c.ru/8.3/MDClasses" version="2.21">
+	<ExternalDataProcessor uuid="0e846872-739d-48cb-b5da-090675b83157">
+		<InternalInfo>
+			<xr:ContainedObject xmlns:xr="http://v8.1c.ru/8.3/xcf/readable">
+				<xr:ClassId>c3831ec8-d8d5-4f93-8a22-f9bfae07327f</xr:ClassId>
+				<xr:ObjectId>2cab6a3b-ad4f-42c6-92fc-fa43bb53a220</xr:ObjectId>
+			</xr:ContainedObject>
+			<xr:GeneratedType name="ExternalDataProcessorObject.with_form" category="Object" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable">
+				<xr:TypeId>c7fdaf1c-d56a-4d43-bd7d-3601ce1bde5f</xr:TypeId>
+				<xr:ValueId>0238e2b5-f6bd-4c68-96b8-07cdc340e1dd</xr:ValueId>
+			</xr:GeneratedType>
+		</InternalInfo>
+		<Properties>
+			<Name>with_form</Name>
+			<Synonym>
+				<v8:item xmlns:v8="http://v8.1c.ru/8.1/data/core">
+					<v8:lang>ru</v8:lang>
+					<v8:content>With form</v8:content>
+				</v8:item>
+			</Synonym>
+			<Comment></Comment>
+			<DefaultForm/>
+			<AuxiliaryForm/>
+		</Properties>
+		<ChildObjects>
+			<Form>Форма</Form>
+		</ChildObjects>
+	</ExternalDataProcessor>
+</MetaDataObject>

@@ -6,7 +6,7 @@ Thank you for your interest in contributing to **far1c**! This document provides
 
 ### Prerequisites
 
-- [Rust toolchain](https://rustup.rs/) (1.70 or later)
+- [Rust toolchain](https://rustup.rs/) (1.88 or later)
 - FAR Manager 3 (Windows) or far2l (Linux) for testing
 - Test 1C artifacts (`.epf`, `.erf`, `.cf`, `.cfe` files) — samples are provided in the `tests/` directory
 
