@@ -95,15 +95,19 @@ The project follows a three-layer architecture:
 src/
 ├── lib.rs                       # Entry point, conditional Far API export
 ├── far/                         # LAYER 1: FAR Manager interaction (Static Multi-Feature)
+│   ├── mod.rs                   # GUIDs/globals, API exports mount
 │   ├── far3/                    # Implementation for FAR Manager 3 (Windows)
+│   │   ├── mod.rs
 │   │   ├── api.rs               # Far Plugin SDK 3.0 bindings
 │   │   ├── exports.rs           # Exported C ABI functions
 │   │   └── ui.rs                # UI dialogs for FAR 3
 │   ├── far2l/                   # Implementation for far2l (Linux/macOS)
+│   │   ├── mod.rs
 │   │   ├── api.rs               # far2l Plugin API bindings
 │   │   ├── exports.rs           # Exported C ABI functions
 │   │   └── ui.rs                # UI dialogs for far2l
 │   ├── far2m/                   # Implementation for far2m (Linux/macOS/BSD)
+│   │   ├── mod.rs
 │   │   ├── api.rs               # far2m Plugin API bindings
 │   │   ├── exports.rs           # Exported C ABI functions
 │   │   └── ui.rs                # UI dialogs for far2m
@@ -114,14 +118,32 @@ src/
 │   ├── lang.rs                  # Localization via .lng files
 │   └── settings.rs              # Plugin settings (unpack style, backup)
 ├── v8/                          # LAYER 2: 1C artifact semantics
+│   ├── mod.rs                   # Entry point for V8 module
 │   ├── container.rs             # CF container reader (ImageHeader, rows, pages)
 │   ├── vfs_builder.rs           # VFS tree builder from container rows
 │   ├── writer.rs                # CF container writer (repacking)
 │   ├── uuids.rs                 # 1C metadata object type UUIDs
+│   ├── styles/                  # Unpacking and presentation styles
+│   │   ├── mod.rs               # PresentationStyle trait and dispatching
+│   │   ├── raw.rs               # Raw binary extraction style
+│   │   ├── full_parse.rs        # Full-parse style (structured metadata files)
+│   │   ├── v8unpack.rs          # V8Unpack style (header + data files)
+│   │   ├── json.rs              # JSON style (saby v8unpack format)
+│   │   ├── edt.rs               # EDT style (1C:EDT project format)
+│   │   ├── metadata_parser.rs   # Shared parsing helper for object metadata structures
+│   │   └── configurator/        # Configurator dump style
+│   │       ├── mod.rs           # Configurator style entry point and directory layout
+│   │       └── schema/          # Schema parsers for configurator presentation
+│   │           ├── mod.rs       # Entry and helper structs for schemas
+│   │           ├── form_layout.rs  # Parser for 1C form layout XML files
+│   │           ├── metadata_xml.rs # Parser for metadata XML files (objects/configs)
+│   │           └── synonyms.rs     # Parser for synonyms/multilanguage strings
 │   └── tests.rs                 # Integration tests
 └── base/                        # LAYER 3: Low-level primitives (I/O, parsing)
+    ├── mod.rs                   # Entry point for base primitives
     ├── reader.rs                # Abstract reader (FileReader, StringReader)
     ├── parser.rs                # Bracket-format parser for 1C metadata
+    ├── bracket_json.rs          # Converts 1C bracket-format strings to JSON
     └── deflate.rs               # DEFLATE via flate2
 ```
 

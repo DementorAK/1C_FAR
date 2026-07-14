@@ -163,6 +163,24 @@ mod integration {
         assert!(!children.is_empty(), "Forms not empty");
         assert!(children.iter().any(|e| e.name().ends_with(".xml")));
         assert!(children.iter().any(|e| e.is_dir()));
+        // Verify Форма.xml has proper Form XML (not the minimal fallback)
+        for e in children {
+            if let VfsEntry::File { name, data, .. } = e {
+                if name.ends_with(".xml") {
+                    let content = String::from_utf8_lossy(data);
+                    assert!(
+                        content.contains("<FormType>Managed</FormType>"),
+                        "{} must contain FormType",
+                        name
+                    );
+                    assert!(
+                        content.contains("<Synonym>"),
+                        "{} must have Synonym items",
+                        name
+                    );
+                }
+            }
+        }
     }
 
     #[test]

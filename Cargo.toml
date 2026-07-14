@@ -22,7 +22,7 @@ far2l = []  # far2l Plugin API (Linux/macOS, wchar_t=u32)
 far2m = []  # far2m Plugin API (Linux/macOS, wchar_t=u32)
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 flate2 = "1.0"

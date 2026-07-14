@@ -2,10 +2,10 @@ use crate::v8::vfs_builder::{BuildVfsError, VfsEntry};
 use std::collections::HashMap;
 
 pub mod configurator;
-pub mod configurator_schema;
 pub mod edt;
 pub mod full_parse;
 pub mod json;
+pub mod metadata_parser;
 pub mod raw;
 pub mod v8unpack;
 

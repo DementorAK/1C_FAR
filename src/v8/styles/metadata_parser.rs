@@ -1,0 +1,759 @@
+//! Shared metadata parser for 1C container formats.
+//!
+//! This module provides the intermediate object representation for 1C metadata.
+//! The bracket format `{value,{nested,...}}` is parsed once into objects here,
+//! and then each presentation style serializes these objects into its target
+//! format (JSON, XML, etc.).
+//!
+//! Exception: Raw, FullParse, and V8Unpack styles work directly with `rows_map`
+//! without using this parser.
+
+use crate::base::parser::{strip_quotes, StructParser};
+use crate::base::reader::StringReader;
+use crate::v8::container::Container;
+use crate::v8::uuids;
+use crate::v8::vfs_builder::BuildVfsError;
+use std::collections::HashMap;
+
+const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
+
+// ---------------------------------------------------------------------------
+// Utility helpers (shared across all semantic styles)
+// ---------------------------------------------------------------------------
+
+pub fn strip_bom(data: &[u8]) -> &[u8] {
+    if data.starts_with(UTF8_BOM) {
+        &data[3..]
+    } else {
+        data
+    }
+}
+
+pub fn data_to_string(data: &[u8]) -> Option<String> {
+    let clean = strip_bom(data);
+    std::str::from_utf8(clean).ok().map(|s| s.to_string())
+}
+
+/// Extract the text module from a row's .0 data (may be nested container).
+/// Returns (text_data, Option<full_container_data>).
+pub fn extract_module_text(data: &[u8]) -> Option<(Vec<u8>, Option<Vec<u8>>)> {
+    if data.is_empty() {
+        return None;
+    }
+    if data.len() >= 4 {
+        if let Ok(bytes) = data[0..4].try_into() {
+            let sig = u32::from_le_bytes(bytes);
+            if sig == crate::v8::container::SIG || (sig as u64) == crate::v8::container::SIG64 {
+                let reader = StringReader::new(data.to_vec());
+                if let Ok(mut container) = Container::new(reader, 0) {
+                    for row in container.rows().flatten() {
+                        if row.id == "text" || row.id == "module" {
+                            return Some((row.data, Some(data.to_vec())));
+                        }
+                    }
+                }
+                // SIG match but no "text" row — treat as raw data (e.g. protected module bytecode)
+            }
+        }
+    }
+    Some((data.to_vec(), None))
+}
+
+/// Extract name from a subordinate object header.
+/// Tries multiple known positional paths.
+pub fn extract_item_name(header_data: &[u8]) -> Option<String> {
+    let source = data_to_string(header_data)?;
+    let parser = StructParser::new(source).ok()?;
+    // Form name paths
+    parser
+        .get_leaf(&[1, 1, 1, 1, 2])
+        // Template name path
+        .or_else(|| parser.get_leaf(&[1, 2, 2]))
+        // Common module / role / language name
+        .or_else(|| parser.get_leaf(&[1, 1, 2]))
+        // Fallback paths
+        .or_else(|| parser.get_leaf(&[2, 2, 2, 3]))
+        .or_else(|| parser.get_leaf(&[2, 2, 2, 2, 3]))
+        .map(|n| strip_quotes(n).to_string())
+        .filter(|n| !n.is_empty() && n.len() <= 150)
+}
+
+pub fn is_protected_module(data: &[u8]) -> bool {
+    if data.is_empty() {
+        return false;
+    }
+    if data.starts_with(UTF8_BOM) {
+        return false;
+    }
+    if let Ok(s) = std::str::from_utf8(data) {
+        let t = s.trim_start();
+        if t.starts_with("//")
+            || t.starts_with("Процедура")
+            || t.starts_with("Функция")
+            || t.starts_with("Procedure")
+            || t.starts_with("Function")
+        {
+            return false;
+        }
+    }
+    true
+}
+
+pub fn has_real_content(data: &[u8]) -> bool {
+    let stripped = strip_bom(data);
+    !stripped.is_empty() && stripped.iter().any(|&b| !b.is_ascii_whitespace())
+}
+
+pub fn short_uuid(uuid: &str) -> String {
+    if uuid.len() >= 8 {
+        uuid[..8].to_string()
+    } else {
+        uuid.to_string()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Intermediate object model
+// ---------------------------------------------------------------------------
+
+/// The type of 1C container.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ContainerType {
+    /// Single object (EPF/ERF)
+    SingleObject,
+    /// Full configuration (CF)
+    Configuration,
+    /// Configuration extension (CFE)
+    Extension,
+}
+
+/// Module data extracted from a metadata object.
+#[derive(Debug, Clone)]
+pub struct ModuleData {
+    pub text: Vec<u8>,
+    pub is_protected: bool,
+    pub origin_row_id: Option<String>,
+    pub original_container: Option<Vec<u8>>,
+}
+
+/// A subordinate object (Form, Template, Command, etc.).
+#[derive(Debug, Clone)]
+pub struct SubordinateObject {
+    /// UUID of this subordinate object instance
+    pub uuid: String,
+    /// Human-readable name extracted from the header
+    pub name: String,
+    /// Display name of the group this belongs to ("Forms", "Templates", etc.)
+    pub group_name: String,
+    /// Module data (for Forms — from body .0, for others — if present)
+    pub module: Option<ModuleData>,
+    /// Raw header data (bracket structure bytes)
+    pub header_data: Option<Vec<u8>>,
+    /// Raw body data (bracket structure bytes or binary)
+    pub body_data: Option<Vec<u8>>,
+    /// Body row key (e.g., "{uuid}.0")
+    pub body_key: String,
+}
+
+/// Collected subordinate instances grouped by type name.
+#[derive(Debug, Clone)]
+pub struct SubordinateGroup {
+    pub display_name: String,
+    pub instance_uuids: Vec<String>,
+}
+
+/// A top-level metadata object (DataProcessor, Report, Catalog, etc.).
+#[derive(Debug, Clone)]
+pub struct MetadataObject {
+    /// UUID of this object
+    pub uuid: String,
+    /// Human-readable name (extracted from bracket data)
+    pub name: String,
+    /// Class name (e.g., "ExternalDataProcessor", "ExternalReport", "Catalog")
+    pub class_name: String,
+    /// Object module (ObjectModule.bsl)
+    pub module: Option<ModuleData>,
+    /// Raw header data for this object (bracket bytes from rows_map[uuid])
+    pub header_data: Option<Vec<u8>>,
+    /// Subordinate objects grouped by type
+    pub subordinate_groups: Vec<SubordinateGroupResolved>,
+}
+
+/// A resolved subordinate group with full object details.
+#[derive(Debug, Clone)]
+pub struct SubordinateGroupResolved {
+    pub display_name: String,
+    pub objects: Vec<SubordinateObject>,
+}
+
+/// Full parsed container metadata.
+#[derive(Debug, Clone)]
+pub struct ContainerMetadata {
+    /// Container type (single object / configuration / extension)
+    pub container_type: ContainerType,
+    /// UUID of the root object
+    pub root_uuid: String,
+    /// Top-level metadata objects (for CF: grouped under type groups; for EPF: just one)
+    pub objects: Vec<MetadataObject>,
+    /// Type group names → objects (for CF/CFE: "Reports", "Catalogs", etc.)
+    pub type_groups: Vec<TypeGroup>,
+    /// IDs of rows used by the parsed metadata (for tracking "remaining" rows)
+    pub used_row_ids: std::collections::HashSet<String>,
+}
+
+/// A type group (e.g., "Reports", "Catalogs") containing metadata objects.
+#[derive(Debug, Clone)]
+pub struct TypeGroup {
+    pub display_name: String,
+    pub objects: Vec<MetadataObject>,
+}
+
+// ---------------------------------------------------------------------------
+// Parsing functions
+// ---------------------------------------------------------------------------
+
+pub fn parse_root(
+    rows_map: &HashMap<String, Vec<u8>>,
+) -> Result<(String, StructParser), BuildVfsError> {
+    // EPF/ERF/CF: have a "root" row with {2, UUID}
+    if let Some(root_data) = rows_map.get("root") {
+        let root_str = data_to_string(root_data)
+            .ok_or_else(|| BuildVfsError::MetadataError("'root' not UTF-8".into()))?;
+        let root_parser = StructParser::new(root_str)
+            .map_err(|e| BuildVfsError::MetadataError(format!("root parse: {}", e)))?;
+        let root_uuid = root_parser
+            .get_leaf(&[1])
+            .ok_or_else(|| BuildVfsError::MetadataError("root[1] UUID missing".into()))?
+            .to_string();
+        return Ok((root_uuid, root_parser));
+    }
+
+    // CFE: no "root" row. Find the extension descriptor by looking for the
+    // largest UUID row (the extension root descriptor is typically the biggest).
+    let utility_rows = ["version", "versions", "copyinfo", "configinfo"];
+    let mut best: Option<(&str, usize)> = None;
+    for (id, data) in rows_map {
+        if utility_rows.contains(&id.as_str()) || id.ends_with(".0") {
+            continue;
+        }
+        if id.contains('-') {
+            let size = data.len();
+            if best.is_none() || size > best.unwrap().1 {
+                best = Some((id.as_str(), size));
+            }
+        }
+    }
+
+    if let Some((uuid, _)) = best {
+        let uuid_str = uuid.to_string();
+        // Create a synthetic root parser with the UUID
+        let synthetic = format!("{{2,{},}}", uuid_str);
+        let root_parser = StructParser::new(synthetic)
+            .map_err(|e| BuildVfsError::MetadataError(format!("synthetic root: {}", e)))?;
+        return Ok((uuid_str, root_parser));
+    }
+
+    Err(BuildVfsError::MetadataError(
+        "no 'root' or 'configinfo' found".into(),
+    ))
+}
+
+pub fn parse_object(
+    rows_map: &HashMap<String, Vec<u8>>,
+    uuid: &str,
+) -> Result<StructParser, BuildVfsError> {
+    let data = rows_map
+        .get(uuid)
+        .ok_or_else(|| BuildVfsError::MetadataError(format!("object '{}' not found", uuid)))?;
+    let s = data_to_string(data)
+        .ok_or_else(|| BuildVfsError::MetadataError(format!("object '{}' not UTF-8", uuid)))?;
+    StructParser::new(s)
+        .map_err(|e| BuildVfsError::MetadataError(format!("parse '{}': {}", uuid, e)))
+}
+
+/// Enumerate subordinate types from a metadata branch.
+pub fn enumerate_subordinates(
+    parser: &StructParser,
+    base_path: &[usize],
+    start_idx: usize,
+) -> Vec<SubordinateGroup> {
+    let mut groups = Vec::new();
+    let branch_len = match parser.branch_len(base_path) {
+        Some(len) => len,
+        None => return groups,
+    };
+
+    for idx in start_idx..branch_len {
+        let mut type_path = base_path.to_vec();
+        type_path.push(idx);
+
+        // type_uuid at [base][idx][0]
+        let mut uuid_path = type_path.clone();
+        uuid_path.push(0);
+
+        if let Some(type_uuid) = parser.get_leaf(&uuid_path) {
+            let type_uuid = type_uuid.trim();
+            let display_name = uuids::metadata_type_name(type_uuid)
+                .unwrap_or("Unknown")
+                .to_string();
+
+            // Count at [base][idx][1], instances at [base][idx][2..]
+            let mut instance_uuids = Vec::new();
+            if let Some(grp_len) = parser.branch_len(&type_path) {
+                for j in 2..grp_len {
+                    let mut inst_path = type_path.clone();
+                    inst_path.push(j);
+                    if let Some(uuid) = parser.get_leaf(&inst_path) {
+                        let uuid = uuid.trim();
+                        if !uuid.is_empty() && uuid != "0" && uuid != "\"\"" {
+                            instance_uuids.push(uuid.to_string());
+                        }
+                    }
+                }
+            }
+
+            if !instance_uuids.is_empty() && display_name != "Unknown" {
+                groups.push(SubordinateGroup {
+                    display_name,
+                    instance_uuids,
+                });
+            }
+        }
+    }
+    groups
+}
+
+/// Detect whether the root object is a configuration (CF) or a single object (EPF/ERF).
+pub fn is_configuration_format(rows_map: &HashMap<String, Vec<u8>>, root_uuid: &str) -> bool {
+    let empty_vec = Vec::new();
+    let root_data = rows_map.get(root_uuid).unwrap_or(&empty_vec);
+
+    let s = String::from_utf8_lossy(root_data).to_lowercase();
+    let has_reports = s.contains("631b75a0-29e2-11d6-a3c7-0050bae0a776");
+    let has_catalogs = s.contains("cf4abea6-37b2-11d4-940f-008048da11f9");
+    let has_documents = s.contains("061d872a-5787-460e-95ac-ed74ea3a3e84");
+    let has_dataprocessors = s.contains("bf845118-327b-4682-b5c6-285d2a0eb296")
+        || s.contains("84f1eb25-06ab-445a-8b89-9a2eb242cecd");
+
+    let groups = [has_reports, has_catalogs, has_documents, has_dataprocessors];
+    let group_count = groups.iter().filter(|&&x| x).count();
+
+    group_count >= 1
+}
+
+/// Extract object name from its descriptor row.
+pub fn extract_object_name(rows_map: &HashMap<String, Vec<u8>>, uuid: &str) -> String {
+    if let Some(data) = rows_map.get(uuid) {
+        if let Some(s) = data_to_string(data) {
+            if let Ok(parser) = StructParser::new(s) {
+                let name = parser
+                    .get_leaf(&[1, 3, 1, 2]) // CF object
+                    .or_else(|| parser.get_leaf(&[3, 1, 1, 3, 1, 2])) // EPF-like
+                    .or_else(|| parser.get_leaf(&[1, 1, 2])) // simple objects (role, language)
+                    .or_else(|| parser.get_leaf(&[1, 2, 2])); // template-like
+
+                if let Some(n) = name {
+                    let stripped = strip_quotes(n);
+                    if !stripped.is_empty() && stripped.len() <= 150 {
+                        return stripped.to_string();
+                    }
+                }
+            }
+        }
+    }
+    short_uuid(uuid)
+}
+
+// ---------------------------------------------------------------------------
+// Resolve subordinate objects into full SubordinateGroupResolved
+// ---------------------------------------------------------------------------
+
+/// Resolve subordinate groups into full objects with extracted data.
+pub fn resolve_subordinate_groups(
+    rows_map: &HashMap<String, Vec<u8>>,
+    groups: &[SubordinateGroup],
+    used_ids: &mut std::collections::HashSet<String>,
+) -> Vec<SubordinateGroupResolved> {
+    let mut result = Vec::new();
+
+    for group in groups {
+        let mut objects = Vec::new();
+
+        for inst_uuid in &group.instance_uuids {
+            let header = rows_map.get(inst_uuid);
+            let body_key = format!("{}.0", inst_uuid);
+            let body = rows_map.get(&body_key);
+
+            let name = header
+                .and_then(|d| extract_item_name(d))
+                .unwrap_or_else(|| short_uuid(inst_uuid));
+
+            // Track used IDs
+            used_ids.insert(inst_uuid.clone());
+            used_ids.insert(body_key.clone());
+
+            // Extract module for forms
+            let module = if group.display_name == "Forms" {
+                body.and_then(|b| {
+                    let (module_data, orig_cont) =
+                        extract_module_text(b).unwrap_or((Vec::new(), None));
+                    let is_prot = is_protected_module(&module_data);
+                    if has_real_content(&module_data) || orig_cont.is_some() {
+                        Some(ModuleData {
+                            text: module_data,
+                            is_protected: is_prot,
+                            origin_row_id: Some(body_key.clone()),
+                            original_container: orig_cont,
+                        })
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            };
+
+            objects.push(SubordinateObject {
+                uuid: inst_uuid.clone(),
+                name,
+                group_name: group.display_name.clone(),
+                module,
+                header_data: header.cloned(),
+                body_data: body.cloned(),
+                body_key,
+            });
+        }
+
+        if !objects.is_empty() {
+            result.push(SubordinateGroupResolved {
+                display_name: group.display_name.clone(),
+                objects,
+            });
+        }
+    }
+
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Build MetadataObject for a single object (EPF/ERF)
+// ---------------------------------------------------------------------------
+
+fn build_single_metadata_object(
+    rows_map: &HashMap<String, Vec<u8>>,
+    root_uuid: &str,
+    used_ids: &mut std::collections::HashSet<String>,
+) -> Result<MetadataObject, BuildVfsError> {
+    let root_obj = parse_object(rows_map, root_uuid)?;
+    let obj_name = extract_object_name(rows_map, root_uuid);
+
+    used_ids.insert(root_uuid.to_string());
+    used_ids.insert("root".to_string());
+    used_ids.insert("version".to_string());
+    used_ids.insert("versions".to_string());
+    used_ids.insert("copyinfo".to_string());
+
+    // Determine class name
+    let class_name = {
+        let class_id = root_obj.get_leaf(&[3, 0]).unwrap_or("");
+        if class_id == "e41aff26-25cf-4bb6-b6c1-3f478a75f374" {
+            "ExternalReport"
+        } else {
+            "ExternalDataProcessor"
+        }
+    }
+    .to_string();
+
+    // Extract ObjectModule.bsl — try multiple paths
+    let module_uuid = root_obj
+        .get_leaf(&[3, 1, 1, 3, 1, 1, 2])
+        .map(|s| s.to_string())
+        .or_else(|| root_obj.get_leaf(&[1, 3, 1, 1, 2]).map(|s| s.to_string()))
+        .or_else(|| {
+            root_obj
+                .get_leaf(&[3, 1, 1, 1, 3, 1, 1, 2])
+                .map(|s| s.to_string())
+        })
+        .or_else(|| {
+            // Search for body-only rows (.0 suffix) that have no matching header row
+            rows_map.keys().find_map(|k| {
+                if k.ends_with(".0") {
+                    let base = k.trim_end_matches(".0");
+                    if base != root_uuid && !rows_map.contains_key(base) {
+                        return Some(base.to_string());
+                    }
+                }
+                None
+            })
+        });
+
+    let body_data = module_uuid
+        .as_ref()
+        .and_then(|u| rows_map.get(&format!("{}.0", u)))
+        .or_else(|| rows_map.get(&format!("{}.0", root_uuid)));
+
+    let module = body_data.and_then(|body| {
+        let (text, orig_cont) = extract_module_text(body)?;
+        if has_real_content(&text) {
+            let origin = module_uuid
+                .clone()
+                .map(|u| format!("{}.0", u))
+                .or_else(|| Some(format!("{}.0", root_uuid)));
+            if let Some(ref o) = origin {
+                used_ids.insert(o.clone());
+            }
+            Some(ModuleData {
+                is_protected: is_protected_module(&text),
+                text,
+                origin_row_id: origin,
+                original_container: orig_cont,
+            })
+        } else {
+            None
+        }
+    });
+
+    // Enumerate subordinates from [3][1], starting at index 3
+    let groups = enumerate_subordinates(&root_obj, &[3, 1], 3);
+    let subordinate_groups = resolve_subordinate_groups(rows_map, &groups, used_ids);
+
+    Ok(MetadataObject {
+        uuid: root_uuid.to_string(),
+        name: obj_name,
+        class_name,
+        module,
+        header_data: rows_map.get(root_uuid).cloned(),
+        subordinate_groups,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Build MetadataObject for a CF/CFE sub-object
+// ---------------------------------------------------------------------------
+
+fn build_cf_metadata_object(
+    rows_map: &HashMap<String, Vec<u8>>,
+    obj_uuid: &str,
+    used_ids: &mut std::collections::HashSet<String>,
+) -> MetadataObject {
+    let obj_name = extract_object_name(rows_map, obj_uuid);
+    used_ids.insert(obj_uuid.to_string());
+
+    let mut module = None;
+    let mut subordinate_groups = Vec::new();
+
+    if let Ok(obj_parser) = parse_object(rows_map, obj_uuid) {
+        // Object module
+        let module_uuid = obj_parser
+            .get_leaf(&[1, 3, 1, 1, 2])
+            .or_else(|| obj_parser.get_leaf(&[3, 1, 1, 3, 1, 1, 2]))
+            .map(|s| s.to_string());
+        let body_data = module_uuid
+            .as_ref()
+            .and_then(|u| rows_map.get(&format!("{}.0", u)))
+            .or_else(|| rows_map.get(&format!("{}.0", obj_uuid)));
+
+        module = body_data.and_then(|body| {
+            let (text, orig_cont) = extract_module_text(body)?;
+            if has_real_content(&text) {
+                let origin = module_uuid
+                    .clone()
+                    .map(|u| format!("{}.0", u))
+                    .or_else(|| Some(format!("{}.0", obj_uuid)));
+                if let Some(ref o) = origin {
+                    used_ids.insert(o.clone());
+                }
+                Some(ModuleData {
+                    is_protected: is_protected_module(&text),
+                    text,
+                    origin_row_id: origin,
+                    original_container: orig_cont,
+                })
+            } else {
+                None
+            }
+        });
+
+        // Enumerate subordinates
+        let count_str = obj_parser.get_leaf(&[2]).unwrap_or("0");
+        let start_idx: usize = count_str.parse::<usize>().ok().map(|_| 3).unwrap_or(3);
+        let groups = enumerate_subordinates(&obj_parser, &[], start_idx);
+        subordinate_groups = resolve_subordinate_groups(rows_map, &groups, used_ids);
+    }
+
+    // Determine class name from group context (will be set by caller if needed)
+    MetadataObject {
+        uuid: obj_uuid.to_string(),
+        name: obj_name,
+        class_name: String::new(), // Set by caller based on group context
+        module,
+        header_data: rows_map.get(obj_uuid).cloned(),
+        subordinate_groups,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Build configuration/extension metadata
+// ---------------------------------------------------------------------------
+
+fn build_configuration_metadata(
+    rows_map: &HashMap<String, Vec<u8>>,
+    root_uuid: &str,
+    used_ids: &mut std::collections::HashSet<String>,
+) -> Result<Vec<TypeGroup>, BuildVfsError> {
+    let root_obj = parse_object(rows_map, root_uuid)?;
+    let mut type_groups = Vec::new();
+
+    used_ids.insert(root_uuid.to_string());
+    used_ids.insert("root".to_string());
+    used_ids.insert("version".to_string());
+    used_ids.insert("versions".to_string());
+    used_ids.insert("copyinfo".to_string());
+
+    let root_len = root_obj.branch_len(&[]).unwrap_or(0);
+
+    for idx in 0..root_len {
+        let group_uuid = root_obj.get_leaf(&[idx, 0]);
+
+        if let Some(group_uuid) = group_uuid {
+            if uuids::is_metadata_group(group_uuid) {
+                let mut groups = enumerate_subordinates(&root_obj, &[idx, 1], 3);
+                let deeper = enumerate_subordinates(&root_obj, &[idx, 1, 1], 3);
+                groups.extend(deeper);
+
+                for group in &groups {
+                    let mut objects = Vec::new();
+
+                    for obj_uuid in &group.instance_uuids {
+                        let mut obj = build_cf_metadata_object(rows_map, obj_uuid, used_ids);
+                        // Set class name from group display name
+                        obj.class_name = group.display_name.clone();
+                        objects.push(obj);
+                    }
+
+                    if !objects.is_empty() {
+                        type_groups.push(TypeGroup {
+                            display_name: group.display_name.clone(),
+                            objects,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(type_groups)
+}
+
+fn build_extension_metadata(
+    rows_map: &HashMap<String, Vec<u8>>,
+    used_ids: &mut std::collections::HashSet<String>,
+) -> Result<(String, Vec<TypeGroup>), BuildVfsError> {
+    let utility_rows = ["version", "versions", "copyinfo", "configinfo"];
+    for u in &utility_rows {
+        used_ids.insert(u.to_string());
+    }
+
+    let mut type_group_map: HashMap<String, Vec<MetadataObject>> = HashMap::new();
+
+    // Find the extension root descriptor (largest UUID row)
+    let mut root_uuid: Option<String> = None;
+    let mut root_size = 0;
+    for (id, data) in rows_map {
+        if utility_rows.contains(&id.as_str()) || id.ends_with(".0") {
+            continue;
+        }
+        if id.contains('-') && data.len() > root_size {
+            root_size = data.len();
+            root_uuid = Some(id.clone());
+        }
+    }
+
+    let ext_root_uuid = root_uuid.unwrap_or_default();
+
+    if let Ok(root_obj) = parse_object(rows_map, &ext_root_uuid) {
+        used_ids.insert(ext_root_uuid.clone());
+        let root_len = root_obj.branch_len(&[]).unwrap_or(0);
+
+        for idx in 0..root_len {
+            if let Some(group_uuid) = root_obj.get_leaf(&[idx, 0]) {
+                if uuids::is_metadata_group(group_uuid) {
+                    let mut sub_groups = enumerate_subordinates(&root_obj, &[idx, 1], 3);
+                    let deeper = enumerate_subordinates(&root_obj, &[idx, 1, 1], 3);
+                    sub_groups.extend(deeper);
+                    for sub_group in &sub_groups {
+                        for obj_uuid in &sub_group.instance_uuids {
+                            let mut obj = build_cf_metadata_object(rows_map, obj_uuid, used_ids);
+                            obj.class_name = sub_group.display_name.clone();
+                            type_group_map
+                                .entry(sub_group.display_name.clone())
+                                .or_default()
+                                .push(obj);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let type_groups: Vec<TypeGroup> = type_group_map
+        .into_iter()
+        .map(|(name, objects)| TypeGroup {
+            display_name: name,
+            objects,
+        })
+        .collect();
+
+    Ok((ext_root_uuid, type_groups))
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point: parse_container
+// ---------------------------------------------------------------------------
+
+/// Parse a 1C container's rows_map into structured metadata objects.
+///
+/// This is the single shared entry point that all semantic styles use.
+/// Returns `ContainerMetadata` with the parsed object tree.
+pub fn parse_container(
+    rows_map: &HashMap<String, Vec<u8>>,
+) -> Result<ContainerMetadata, BuildVfsError> {
+    let mut used_ids = std::collections::HashSet::new();
+
+    // Detect container type
+    if !rows_map.contains_key("root") && rows_map.contains_key("configinfo") {
+        // CFE (extension)
+        let (root_uuid, type_groups) = build_extension_metadata(rows_map, &mut used_ids)?;
+        return Ok(ContainerMetadata {
+            container_type: ContainerType::Extension,
+            root_uuid,
+            objects: Vec::new(),
+            type_groups,
+            used_row_ids: used_ids,
+        });
+    }
+
+    let (root_uuid, _root_parser) = parse_root(rows_map)?;
+
+    if is_configuration_format(rows_map, &root_uuid) {
+        // CF (configuration)
+        let type_groups = build_configuration_metadata(rows_map, &root_uuid, &mut used_ids)?;
+        Ok(ContainerMetadata {
+            container_type: ContainerType::Configuration,
+            root_uuid,
+            objects: Vec::new(),
+            type_groups,
+            used_row_ids: used_ids,
+        })
+    } else {
+        // EPF/ERF (single object)
+        let obj = build_single_metadata_object(rows_map, &root_uuid, &mut used_ids)?;
+        Ok(ContainerMetadata {
+            container_type: ContainerType::SingleObject,
+            root_uuid,
+            objects: vec![obj],
+            type_groups: Vec::new(),
+            used_row_ids: used_ids,
+        })
+    }
+}

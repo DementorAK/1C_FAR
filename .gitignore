@@ -11,6 +11,7 @@
 Cargo.lock
 
 # IDE files
+.agent/
 .idea/
 .vscode/
 *.swp
@@ -20,3 +21,7 @@ Cargo.lock
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local notes and Sandbox
+notes/
+investigation/
