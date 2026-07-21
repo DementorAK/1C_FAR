@@ -18,7 +18,8 @@ use std::collections::HashMap;
 // Re-export types used by external callers
 pub use form_layout::get_group_type_and_name_idx_pub;
 pub use metadata_xml::{
-    extract_epf_child_objects, extract_epf_uuid_name_map, gen_attribute_xml, xml_to_bracket, ChildObjectRef,
+    extract_epf_child_objects, extract_epf_uuid_name_map, gen_attribute_xml, xml_to_bracket,
+    ChildObjectRef,
 };
 
 // ---------------------------------------------------------------------------

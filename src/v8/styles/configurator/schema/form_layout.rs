@@ -64,7 +64,8 @@ fn get_name_heuristic(arr: &[Value]) -> Option<String> {
             if s.starts_with('"') && s.ends_with('"') {
                 let clean = s.trim_matches('"');
                 if !clean.is_empty() {
-                    let is_uuid = clean.len() == 36 && clean.chars().filter(|c| *c == '-').count() == 4;
+                    let is_uuid =
+                        clean.len() == 36 && clean.chars().filter(|c| *c == '-').count() == 4;
                     if !is_uuid {
                         return Some(clean.to_string());
                     }
@@ -243,10 +244,9 @@ fn resolve_datapath(
             if first == 0 {
                 if let Some(uuid) = seg[1].as_str() {
                     let uuid_clean = uuid.trim_matches('"');
-                    let name = uuid_map
-                        .get(uuid_clean)
-                        .cloned()
-                        .unwrap_or_else(|| format!("Unknown_{}", &uuid_clean[..8.min(uuid_clean.len())]));
+                    let name = uuid_map.get(uuid_clean).cloned().unwrap_or_else(|| {
+                        format!("Unknown_{}", &uuid_clean[..8.min(uuid_clean.len())])
+                    });
                     parts.push(name);
                 }
             }
@@ -797,8 +797,6 @@ fn gen_form_item(
     // We no longer hardcode RadioButtonType or EditMode/ExtendedEditMultipleValues here,
     // because it causes discrepancies when the actual value differs from the hardcoded one.
 
-
-
     if let Some(title) = get_title(item_arr) {
         let t = title.replace("\n\t\t\t", &format!("\n{}\t", child_indent));
         xml.push_str(&t);
@@ -885,14 +883,20 @@ fn gen_form_item(
         if let Some(color_arr) = item_arr.get(15).and_then(|v| v.as_array()) {
             if color_arr.len() > 3 {
                 // Hardcoding typical SpecialTextColor mapping for now based on structure
-                xml.push_str(&format!("{}\t<TextColor>style:SpecialTextColor</TextColor>\n", child_indent));
+                xml.push_str(&format!(
+                    "{}\t<TextColor>style:SpecialTextColor</TextColor>\n",
+                    child_indent
+                ));
             }
         }
         // Extract Font (index 16)
         if let Some(font_arr) = item_arr.get(16).and_then(|v| v.as_array()) {
             if font_arr.len() > 4 {
                 let scale = font_arr.get(4).and_then(|v| v.as_str()).unwrap_or("100");
-                xml.push_str(&format!("{}\t<Font ref=\"style:NormalTextFont\" kind=\"StyleItem\" scale=\"{}\"/>\n", child_indent, scale));
+                xml.push_str(&format!(
+                    "{}\t<Font ref=\"style:NormalTextFont\" kind=\"StyleItem\" scale=\"{}\"/>\n",
+                    child_indent, scale
+                ));
             }
         }
         // Extract Picture for PictureDecoration (discriminator "1")
@@ -903,11 +907,20 @@ fn gen_form_item(
                         if let Some(uuid) = uuid_arr.get(1).and_then(|v| v.as_str()) {
                             xml.push_str(&format!("{}\t<Picture>\n", child_indent));
                             if uuid == "47f01799-7968-4f44-9acc-fe1bdde8beb2" {
-                                xml.push_str(&format!("{}\t\t<xr:Ref>StdPicture.ActiveUsers</xr:Ref>\n", child_indent));
+                                xml.push_str(&format!(
+                                    "{}\t\t<xr:Ref>StdPicture.ActiveUsers</xr:Ref>\n",
+                                    child_indent
+                                ));
                             } else {
-                                xml.push_str(&format!("{}\t\t<xr:Ref>StdPicture.{}</xr:Ref>\n", child_indent, uuid));
+                                xml.push_str(&format!(
+                                    "{}\t\t<xr:Ref>StdPicture.{}</xr:Ref>\n",
+                                    child_indent, uuid
+                                ));
                             }
-                            xml.push_str(&format!("{}\t\t<xr:LoadTransparent>true</xr:LoadTransparent>\n", child_indent));
+                            xml.push_str(&format!(
+                                "{}\t\t<xr:LoadTransparent>true</xr:LoadTransparent>\n",
+                                child_indent
+                            ));
                             xml.push_str(&format!("{}\t</Picture>\n", child_indent));
                         }
                     }
@@ -995,12 +1008,14 @@ pub fn bracket_to_formlayout_xml(
     } else {
         HashMap::new()
     };
-    
+
     fn collect_form_uuids(val: &Value, map: &mut HashMap<String, String>) {
         if let Some(arr) = val.as_array() {
             for i in 0..arr.len() {
                 if i + 1 < arr.len() {
-                    if let (Some(uuid_arr), Some(name_val)) = (arr[i].as_array(), arr[i+1].as_str()) {
+                    if let (Some(uuid_arr), Some(name_val)) =
+                        (arr[i].as_array(), arr[i + 1].as_str())
+                    {
                         if uuid_arr.len() == 2 && uuid_arr[0].as_str() == Some("0") {
                             if let Some(uuid) = uuid_arr[1].as_str() {
                                 if name_val.starts_with('"') && name_val.ends_with('"') {
@@ -1015,11 +1030,11 @@ pub fn bracket_to_formlayout_xml(
             }
         }
     }
-    
+
     if let Some(attrs_arr) = root.get(3) {
         collect_form_uuids(attrs_arr, &mut local_uuid_map);
     }
-    
+
     let uuid_map = &local_uuid_map;
 
     // Build attr_id → name map from FormAttributes (index 3)
