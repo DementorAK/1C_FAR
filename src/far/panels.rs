@@ -230,10 +230,13 @@ impl PluginPanel {
         writer_logic.revision = 6;
         let mut buffer = Vec::new();
 
-        // Combine rows and packed state
+        // Combine rows and packed state.
+        // Fallback to false so newly-added rows (created by the user, not present
+        // at load_container time) are written uncompressed by default; styles
+        // explicitly opt-in to compression via origin_row_packed propagation.
         let mut full_rows = HashMap::new();
         for (id, data) in &self.rows_map {
-            let is_packed = self.packed_map.get(id).cloned().unwrap_or(true);
+            let is_packed = self.packed_map.get(id).copied().unwrap_or(false);
             full_rows.insert(id.clone(), (data.clone(), is_packed));
         }
 
@@ -283,7 +286,7 @@ impl PluginPanel {
     /// Rebuilds the VFS tree according to the current style
     pub fn rebuild_vfs(&mut self) -> Result<(), String> {
         let style = self.get_style();
-        match style.build_vfs(&self.rows_map) {
+        match style.build_vfs(&self.rows_map, &self.packed_map) {
             Ok(vfs) => {
                 self.vfs = vfs;
                 self.current_dir.clear();
@@ -317,6 +320,6 @@ impl PluginPanel {
 
     fn sync_vfs_to_rows(&mut self) {
         let style = self.get_style();
-        style.sync_vfs_to_rows(&self.vfs, &mut self.rows_map);
+        style.sync_vfs_to_rows(&self.vfs, &mut self.rows_map, &mut self.packed_map);
     }
 }

@@ -7,15 +7,29 @@ pub mod full_parse;
 pub mod json;
 pub mod metadata_parser;
 pub mod raw;
+pub mod rewrap;
 pub mod v8unpack;
 
 pub trait PresentationStyle: Send + Sync {
-    /// Builds the VFS tree from the raw container rows
+    /// Builds the VFS tree from the raw container rows.
+    ///
+    /// `packed_map` carries, per row id, whether that row was originally
+    /// deflate-compressed in the container. Styles that materialise rows
+    /// into files MUST propagate the corresponding `origin_row_packed` so
+    /// the writer can re-compress edited bytes the same way on save.
     fn build_vfs(
         &self,
         rows_map: &HashMap<String, Vec<u8>>,
+        packed_map: &HashMap<String, bool>,
     ) -> Result<Vec<VfsEntry>, BuildVfsError>;
 
-    /// Synchronizes the modified VFS tree back to the raw rows map
-    fn sync_vfs_to_rows(&self, vfs: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>>);
+    /// Synchronizes the modified VFS tree back to the raw rows map and the
+    /// packed map. Styles MUST fill `packed_out` for every row they emit so
+    /// the writer knows whether to deflate each blob.
+    fn sync_vfs_to_rows(
+        &self,
+        vfs: &[VfsEntry],
+        updates: &mut HashMap<String, Vec<u8>>,
+        packed_out: &mut HashMap<String, bool>,
+    );
 }

@@ -46,6 +46,23 @@ pub fn read_image_header<R: V8Reader>(reader: &mut R, offset: u64) -> io::Result
     }
 }
 
+/// Detect whether a byte slice begins with the 1C container signature.
+///
+/// Matches both 32-bit (`SIG`) and 64-bit (`SIG64`) container headers.
+/// Shared heuristic used by raw/full-parse/v8unpack styles and metadata parser.
+pub fn is_container_data(data: &[u8]) -> bool {
+    if data.len() < 4 {
+        return false;
+    }
+    if let Ok(bytes) = data[0..4].try_into() {
+        let sig = u32::from_le_bytes(bytes);
+        if sig == SIG || (sig as u64) == SIG64 {
+            return true;
+        }
+    }
+    false
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct PageHeader {
     pub full_size: u64,
@@ -114,7 +131,6 @@ pub struct Container<R: V8Reader> {
     pub pointers: Vec<u64>,
     pub is_64bit: bool,
     pub offset: u64,
-    pub size: u64,
 }
 
 impl<R: V8Reader> Container<R> {
@@ -136,12 +152,6 @@ impl<R: V8Reader> Container<R> {
             if first_page {
                 remaining_size = page_header.full_size;
                 first_page = false;
-
-                // Estimate the full document size (including headers)
-                // This is needed to advance `offset` for multi-container files.
-                // In v8unpack, the document size is calculated robustly. For the pointer table,
-                // doc_size = full_size + header_size. If it spans multiple pages, it's slightly more.
-                // A simpler way to get container.size is to sum up all document sizes in read_files.
             }
 
             let mut buf = vec![0u8; page_header.page_size as usize];
@@ -172,7 +182,6 @@ impl<R: V8Reader> Container<R> {
             pointers,
             is_64bit,
             offset,
-            size: 0, // We will compute size later
         })
     }
 

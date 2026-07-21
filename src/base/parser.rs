@@ -2,7 +2,7 @@ use std::fmt;
 
 /// A leaf in the bracket structure tree.
 /// Stores the start and end byte offsets into the original source string.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Leaf {
     pub begin: usize,
     pub end: usize,
@@ -15,7 +15,7 @@ impl Leaf {
 }
 
 /// Represents a node in the parsed bracket structure.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Node {
     /// A leaf value (text between delimiters)
     Leaf(Leaf),
@@ -188,6 +188,58 @@ impl StructParser {
     pub fn root(&self) -> &Node {
         &self.root
     }
+
+    /// Serialize the parsed AST back into the bracket-format string.
+    ///
+    /// Round-trip: `to_bracket()` followed by `StructParser::new(out)` yields an
+    /// equivalent AST to the original. The result uses the compact form
+    /// `{ elem0, elem1, ... }` joined by commas — no indentation or newlines —
+    /// which is sufficient for 1C round-trip (artefacts may contain newlines
+    /// in place of whitespace, but `StructParser::skip_ws` ignores them and
+    /// `to_bracket` produces tokens that reparse identically).
+    ///
+    /// For byte-identical preservation of *original* whitespace, prefer
+    /// `source().to_string()` instead; this function is intended for the case
+    /// when the AST may have been edited before serialization.
+    pub fn to_bracket(&self) -> String {
+        serialize_node_to_bracket(&self.root, &self.source)
+    }
+}
+
+/// Serialize a `Node` AST back into its bracket-format string representation.
+///
+/// `source` must be the same string from which the AST was originally parsed,
+/// so that `Leaf { begin, end }` ranges can be copied verbatim (preserving
+/// quotes, escapes and any leading/trailing whitespace inside the leaf).
+///
+/// Free-form whitespace between elements in the original input is NOT
+/// reproduced: the serializer emits compact `{ a, b, { c, d } }`-style output.
+/// Reparsing this output yields an AST that is semantically equivalent to the
+/// input (same leaf sequence), modulo whitespace differences between tokens.
+pub fn serialize_node_to_bracket(node: &Node, source: &str) -> String {
+    let mut out = String::new();
+    serialize_node_into(node, source, &mut out);
+    out
+}
+
+fn serialize_node_into(node: &Node, source: &str, out: &mut String) {
+    match node {
+        Node::Leaf(leaf) => {
+            if leaf.begin < leaf.end {
+                out.push_str(&source[leaf.begin..leaf.end]);
+            }
+        }
+        Node::Branch(children) => {
+            out.push('{');
+            for (i, child) in children.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                serialize_node_into(child, source, out);
+            }
+            out.push('}');
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -301,5 +353,141 @@ mod tests {
     fn test_incomplete_input() {
         // Incomplete input should return error
         assert!(StructParser::new("{a,".to_string()).is_err());
+    }
+
+    // --- Bracket-AST serializer round-trip tests ---
+
+    #[test]
+    fn test_serialize_simple_round_trip() {
+        for original in ["{a,b,c}", "{0,1,2}", "{ just_one }", "{}"] {
+            let parser = StructParser::new(original.to_string()).unwrap();
+            let out = parser.to_bracket();
+            let re_parser = StructParser::new(out.clone()).unwrap();
+            // Compare elements via get_leaf — the serializer normalises
+            // whitespace between tokens and trims them at the leaf boundaries,
+            // so byte offsets differ but the inner leaf text must match.
+            // For empty branches, get_leaf returns None on both sides.
+            let len = match parser.get_branch(&[]) {
+                Some(c) => c.len(),
+                None => 0,
+            };
+            assert_eq!(
+                parser.get_branch(&[]).map(|c| c.len()),
+                re_parser.get_branch(&[]).map(|c| c.len()),
+                "branch length differ for {:?}: out={:?}",
+                original,
+                out
+            );
+            for i in 0..len {
+                assert_eq!(
+                    parser.get_leaf(&[i]),
+                    re_parser.get_leaf(&[i]),
+                    "leaf [{}] differ for {:?}: out={:?}",
+                    i,
+                    original,
+                    out
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_serialize_nested_round_trip() {
+        let original = "{a,{b,c},d}";
+        let parser = StructParser::new(original.to_string()).unwrap();
+        let out = parser.to_bracket();
+        let re_parser = StructParser::new(out.clone()).unwrap();
+        // Compare leaves via get_leaf for semantic equivalence.
+        assert_eq!(
+            parser.get_branch(&[]).map(|c| c.len()),
+            re_parser.get_branch(&[]).map(|c| c.len())
+        );
+        assert_eq!(parser.get_leaf(&[0]), re_parser.get_leaf(&[0]));
+        assert_eq!(parser.get_leaf(&[1, 0]), re_parser.get_leaf(&[1, 0]));
+        assert_eq!(parser.get_leaf(&[1, 1]), re_parser.get_leaf(&[1, 1]));
+        assert_eq!(parser.get_leaf(&[2]), re_parser.get_leaf(&[2]));
+        // Sanity: serialization shape
+        assert_eq!(out, "{a,{b,c},d}");
+    }
+
+    #[test]
+    fn test_serialize_quoted_value_with_delimiter() {
+        // The quoted value contains a comma; the parser must keep it intact
+        // as a single leaf spanning the quotes, and the serializer must emit
+        // it verbatim.
+        let original = "{{\"quoted,value\"},plain}";
+        let parser = StructParser::new(original.to_string()).unwrap();
+        let out = parser.to_bracket();
+        let re_parser = StructParser::new(out.clone()).unwrap();
+        assert_eq!(parser.get_leaf(&[0, 0]), re_parser.get_leaf(&[0, 0]));
+        assert_eq!(parser.get_leaf(&[1]), re_parser.get_leaf(&[1]));
+        // The serialized form should preserve the quoted value as-is.
+        assert!(out.contains("\"quoted,value\""));
+    }
+
+    #[test]
+    fn test_serialize_empty_branch_round_trip() {
+        let original = "{a,{},b}";
+        let parser = StructParser::new(original.to_string()).unwrap();
+        let out = parser.to_bracket();
+        let re_parser = StructParser::new(out.clone()).unwrap();
+        assert_eq!(
+            parser.get_branch(&[]).map(|c| c.len()),
+            re_parser.get_branch(&[]).map(|c| c.len())
+        );
+        assert_eq!(parser.get_leaf(&[0]), re_parser.get_leaf(&[0]));
+        assert_eq!(parser.get_leaf(&[2]), re_parser.get_leaf(&[2]));
+        // Empty branch serializes as "{}" (not ",," or empty string).
+        assert_eq!(out, "{a,{},b}");
+    }
+
+    #[test]
+    fn test_serialize_deeply_nested() {
+        let original = "{0,1,2,3,{0,1,{0,1,{0,1,2,3,{0,1,2,leaf}}}}}";
+        let parser = StructParser::new(original.to_string()).unwrap();
+        let out = parser.to_bracket();
+        let re_parser = StructParser::new(out.clone()).unwrap();
+        assert_eq!(parser.get_leaf(&[4, 2, 2, 4, 3]), Some("leaf"));
+        assert_eq!(re_parser.get_leaf(&[4, 2, 2, 4, 3]), Some("leaf"));
+    }
+
+    #[test]
+    fn test_serialize_normalizes_whitespace() {
+        // Whitespace between tokens is dropped; the two ASTs are equivalent.
+        let original_1 = "{a, b, c}";
+        let original_2 = "{a,\nb,\nc}";
+        let p1 = StructParser::new(original_1.to_string()).unwrap();
+        let p2 = StructParser::new(original_2.to_string()).unwrap();
+        let out_1 = p1.to_bracket();
+        let out_2 = p2.to_bracket();
+        assert_eq!(out_1, out_2);
+        // Compact form (no spaces around commas or inside braces).
+        assert_eq!(out_1, "{a,b,c}");
+    }
+
+    #[test]
+    fn test_serialize_empty_string() {
+        // Empty branch at root
+        let parser = StructParser::new("{}".to_string()).unwrap();
+        assert_eq!(parser.to_bracket(), "{}");
+    }
+
+    #[test]
+    fn test_serialize_function_on_subtree() {
+        // serialize_node_to_bracket can be applied to a subtree passed directly.
+        let parser = StructParser::new("{a,{b,c},d}".to_string()).unwrap();
+        let subtree = parser.get_branch(&[1]).expect("subtree");
+        let serialized = serialize_node_to_bracket(
+            // get_branch returns &[Node]; take the first child (the {b,c} node).
+            // The branch slice IS the Vec<Node> of the parent's children, so to
+            // serialise node [1] we wrap it as a fabricated Branch with the slice
+            // children. Here we just rebuild a Node::Branch(slice.to_vec()).
+            &Node::Branch(subtree.to_vec()),
+            parser.source(),
+        );
+        let re_parser = StructParser::new(serialized.clone()).unwrap();
+        assert_eq!(re_parser.get_leaf(&[0]), Some("b"));
+        assert_eq!(re_parser.get_leaf(&[1]), Some("c"));
+        assert_eq!(serialized, "{b,c}");
     }
 }

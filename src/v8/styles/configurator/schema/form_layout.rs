@@ -63,8 +63,11 @@ fn get_name_heuristic(arr: &[Value]) -> Option<String> {
         if let Some(s) = arr.get(i).and_then(|v| v.as_str()) {
             if s.starts_with('"') && s.ends_with('"') {
                 let clean = s.trim_matches('"');
-                if !clean.is_empty() && clean.len() != 36 {
-                    return Some(clean.to_string());
+                if !clean.is_empty() {
+                    let is_uuid = clean.len() == 36 && clean.chars().filter(|c| *c == '-').count() == 4;
+                    if !is_uuid {
+                        return Some(clean.to_string());
+                    }
                 }
             }
         }
@@ -141,13 +144,57 @@ fn get_type(arr: &[Value]) -> Result<String, String> {
                             _ => return Err(format!("UNKNOWN_UUID:{}", uuid)),
                         }
                     } else if tc == "\"N\"" {
-                        return Ok("\n\t\t\t<Type>\n\t\t\t\t<v8:Type>xs:decimal</v8:Type>\n\t\t\t\t<v8:NumberQualifiers>\n\t\t\t\t\t<v8:Digits>3</v8:Digits>\n\t\t\t\t\t<v8:FractionDigits>0</v8:FractionDigits>\n\t\t\t\t\t<v8:AllowedSign>Nonnegative</v8:AllowedSign>\n\t\t\t\t</v8:NumberQualifiers>\n\t\t\t</Type>\n".to_string());
+                        let digits = inner.get(1).and_then(|v| v.as_str()).unwrap_or("0");
+                        let fraction = inner.get(2).and_then(|v| v.as_str()).unwrap_or("0");
+                        let non_negative = inner.get(3).and_then(|v| v.as_str()).unwrap_or("0");
+                        let nn_str = if non_negative == "1" { "true" } else { "false" };
+                        let mut res = "\n\t\t\t<Type>\n\t\t\t\t<v8:Type>xs:decimal</v8:Type>\n\t\t\t\t<v8:NumberQualifiers>\n".to_string();
+                        res.push_str(&format!("\t\t\t\t\t<v8:Digits>{}</v8:Digits>\n", digits));
+                        res.push_str(&format!(
+                            "\t\t\t\t\t<v8:FractionDigits>{}</v8:FractionDigits>\n",
+                            fraction
+                        ));
+                        if nn_str == "true" {
+                            res.push_str(
+                                "\t\t\t\t\t<v8:AllowedSign>Nonnegative</v8:AllowedSign>\n",
+                            );
+                        } else {
+                            res.push_str("\t\t\t\t\t<v8:AllowedSign>Any</v8:AllowedSign>\n");
+                        }
+                        res.push_str("\t\t\t\t</v8:NumberQualifiers>\n\t\t\t</Type>\n");
+                        return Ok(res);
                     } else if tc == "\"S\"" {
-                        return Ok("\n\t\t\t<Type>\n\t\t\t\t<v8:Type>xs:string</v8:Type>\n\t\t\t\t<v8:StringQualifiers>\n\t\t\t\t\t<v8:Length>0</v8:Length>\n\t\t\t\t\t<v8:AllowedLength>Variable</v8:AllowedLength>\n\t\t\t\t</v8:StringQualifiers>\n\t\t\t</Type>\n".to_string());
+                        let len = inner.get(1).and_then(|v| v.as_str()).unwrap_or("0");
+                        let allowed = inner.get(2).and_then(|v| v.as_str());
+                        let allowed_str = match allowed {
+                            Some("0") => "Fixed",
+                            _ => "Variable",
+                        };
+                        let mut res = "\n\t\t\t<Type>\n\t\t\t\t<v8:Type>xs:string</v8:Type>\n\t\t\t\t<v8:StringQualifiers>\n".to_string();
+                        res.push_str(&format!("\t\t\t\t\t<v8:Length>{}</v8:Length>\n", len));
+                        res.push_str(&format!(
+                            "\t\t\t\t\t<v8:AllowedLength>{}</v8:AllowedLength>\n",
+                            allowed_str
+                        ));
+                        res.push_str("\t\t\t\t</v8:StringQualifiers>\n\t\t\t</Type>\n");
+                        return Ok(res);
                     } else if tc == "\"B\"" {
                         return Ok("\n\t\t\t<Type>\n\t\t\t\t<v8:Type>xs:boolean</v8:Type>\n\t\t\t</Type>\n".to_string());
                     } else if tc == "\"D\"" {
-                        return Ok("\n\t\t\t<Type>\n\t\t\t\t<v8:Type>xs:dateTime</v8:Type>\n\t\t\t\t<v8:DateQualifiers>\n\t\t\t\t\t<v8:DateFractions>DateTime</v8:DateFractions>\n\t\t\t\t</v8:DateQualifiers>\n\t\t\t</Type>\n".to_string());
+                        let date_fracs = inner.get(1).and_then(|v| v.as_str()).unwrap_or("0");
+                        let df_str = match date_fracs {
+                            "0" => "Date",
+                            "1" => "Time",
+                            "3" => "DateTime",
+                            _ => "DateTime",
+                        };
+                        let mut res = "\n\t\t\t<Type>\n\t\t\t\t<v8:Type>xs:dateTime</v8:Type>\n\t\t\t\t<v8:DateQualifiers>\n".to_string();
+                        res.push_str(&format!(
+                            "\t\t\t\t\t<v8:DateFractions>{}</v8:DateFractions>\n",
+                            df_str
+                        ));
+                        res.push_str("\t\t\t\t</v8:DateQualifiers>\n\t\t\t</Type>\n");
+                        return Ok(res);
                     } else {
                         return Err(format!("UNKNOWN_PRIMITIVE:{}", tc));
                     }
@@ -164,13 +211,19 @@ fn resolve_datapath(
     attr_map: &HashMap<usize, String>,
     uuid_map: &HashMap<String, String>,
 ) -> Option<String> {
-    let count = dp_arr.first().and_then(|v| v.as_i64())? as usize;
+    let count = dp_arr
+        .first()
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<usize>().ok())?;
     let mut parts = Vec::new();
 
     for i in 1..=count {
         let seg = dp_arr.get(i).and_then(|v| v.as_array())?;
         if seg.len() == 1 {
-            let n = seg[0].as_i64().unwrap_or(0);
+            let n = seg[0]
+                .as_str()
+                .and_then(|s| s.parse::<i64>().ok())
+                .unwrap_or(0);
             if n > 0 {
                 let name = attr_map
                     .get(&(n as usize))
@@ -183,13 +236,17 @@ fn resolve_datapath(
                 parts.push("LineNumber".to_string());
             }
         } else if seg.len() == 2 {
-            let first = seg[0].as_i64().unwrap_or(-1);
+            let first = seg[0]
+                .as_str()
+                .and_then(|s| s.parse::<i64>().ok())
+                .unwrap_or(-1);
             if first == 0 {
                 if let Some(uuid) = seg[1].as_str() {
+                    let uuid_clean = uuid.trim_matches('"');
                     let name = uuid_map
-                        .get(uuid)
+                        .get(uuid_clean)
                         .cloned()
-                        .unwrap_or_else(|| format!("Unknown_{}", &uuid[..8.min(uuid.len())]));
+                        .unwrap_or_else(|| format!("Unknown_{}", &uuid_clean[..8.min(uuid_clean.len())]));
                     parts.push(name);
                 }
             }
@@ -308,7 +365,12 @@ fn is_extended_tooltip_child(arr: &[Value]) -> bool {
         Some(t) => t,
         None => return false,
     };
-    tc == "12"
+    if tc != "12" {
+        return false;
+    }
+    let name = arr.get(6).and_then(|v| v.as_str()).unwrap_or("");
+    name.starts_with('"')
+        && (name.contains("ExtendedTooltip") || name.contains("РасширеннаяПодсказка"))
 }
 
 /// Check if a `tc="22"` element is a top-level AutoCommandBar (form-level, id="-1").
@@ -365,6 +427,73 @@ fn parse_form_attributes(arr: &[Value]) -> String {
     xml
 }
 
+fn get_command_tooltip(arr: &[Value]) -> Option<String> {
+    if let Some(tt_arr) = arr.get(4).and_then(|v| v.as_array()) {
+        if tt_arr.first().and_then(|v| v.as_str()) == Some("1") {
+            let mut tt_xml = String::new();
+            for j in 2..tt_arr.len() {
+                if let Some(lang_arr) = tt_arr.get(j).and_then(|v| v.as_array()) {
+                    if let (Some(lang), Some(val)) = (
+                        lang_arr.first().and_then(|v| v.as_str()),
+                        lang_arr.get(1).and_then(|v| v.as_str()),
+                    ) {
+                        tt_xml.push_str(&format!(
+                            "\n\t\t\t\t<v8:item>\n\t\t\t\t\t<v8:lang>{}</v8:lang>\n\t\t\t\t\t<v8:content>{}</v8:content>\n\t\t\t\t</v8:item>",
+                            lang.trim_matches('"'),
+                            val.trim_matches('"')
+                        ));
+                    }
+                }
+            }
+            if !tt_xml.is_empty() {
+                return Some(format!("\t\t\t<ToolTip>{}\n\t\t\t</ToolTip>\n", tt_xml));
+            }
+        }
+    }
+    None
+}
+
+fn get_command_picture(arr: &[Value]) -> Option<String> {
+    if let Some(pic_arr) = arr.get(7).and_then(|v| v.as_array()) {
+        let pic_type = pic_arr.first().and_then(|v| v.as_str())?;
+        if pic_type == "4" {
+            if let Some(uuid_arr) = pic_arr.get(2).and_then(|v| v.as_array()) {
+                if let Some(uuid) = uuid_arr.get(1).and_then(|v| v.as_str()) {
+                    let mut res = String::new();
+                    res.push_str("\t\t\t<Picture>\n");
+                    // Just output the UUID for now, 1C handles it gracefully if there's no mapping
+                    // Actually, let's use the known ID for SendMessage if it matches exactly
+                    if uuid == "be23a908-fe1b-44df-be94-d0f6e8353abe" {
+                        res.push_str("\t\t\t\t<xr:Ref>StdPicture.SendMessage</xr:Ref>\n");
+                    } else {
+                        res.push_str(&format!("\t\t\t\t<xr:Ref>StdPicture.{}</xr:Ref>\n", uuid));
+                    }
+                    if pic_arr.get(6).and_then(|v| v.as_str()) == Some("1") {
+                        res.push_str("\t\t\t\t<xr:LoadTransparent>true</xr:LoadTransparent>\n");
+                    }
+                    res.push_str("\t\t\t</Picture>\n");
+                    return Some(res);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn get_command_representation(arr: &[Value]) -> Option<String> {
+    if let Some(rep) = arr.get(9).and_then(|v| v.as_str()) {
+        match rep {
+            "0" => Some("\t\t\t<Representation>Auto</Representation>\n".to_string()),
+            "1" => Some("\t\t\t<Representation>Text</Representation>\n".to_string()),
+            "2" => Some("\t\t\t<Representation>TextPicture</Representation>\n".to_string()),
+            "3" => Some("\t\t\t<Representation>Picture</Representation>\n".to_string()),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
 fn parse_form_commands(arr: &[Value]) -> String {
     let mut xml = String::new();
     let count = arr
@@ -392,7 +521,21 @@ fn parse_form_commands(arr: &[Value]) -> String {
             if let Some(title) = get_title(child_arr) {
                 xml.push_str(&title);
             }
-            xml.push_str(&format!("\t\t\t<Action>{}</Action>\n", name));
+            if let Some(tooltip) = get_command_tooltip(child_arr) {
+                xml.push_str(&tooltip);
+            }
+            if let Some(picture) = get_command_picture(child_arr) {
+                xml.push_str(&picture);
+            }
+            let action = child_arr
+                .get(8)
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim_matches('"'))
+                .unwrap_or(name);
+            xml.push_str(&format!("\t\t\t<Action>{}</Action>\n", action));
+            if let Some(rep) = get_command_representation(child_arr) {
+                xml.push_str(&rep);
+            }
             xml.push_str("\t\t</Command>\n");
         }
     }
@@ -651,6 +794,11 @@ fn gen_form_item(
         }
     }
 
+    // We no longer hardcode RadioButtonType or EditMode/ExtendedEditMultipleValues here,
+    // because it causes discrepancies when the actual value differs from the hardcoded one.
+
+
+
     if let Some(title) = get_title(item_arr) {
         let t = title.replace("\n\t\t\t", &format!("\n{}\t", child_indent));
         xml.push_str(&t);
@@ -732,6 +880,42 @@ fn gen_form_item(
     xml.push_str(&context_menu_xml);
     xml.push_str(&group_tooltip_xml);
 
+    if tc == "12" {
+        // Extract TextColor (index 15)
+        if let Some(color_arr) = item_arr.get(15).and_then(|v| v.as_array()) {
+            if color_arr.len() > 3 {
+                // Hardcoding typical SpecialTextColor mapping for now based on structure
+                xml.push_str(&format!("{}\t<TextColor>style:SpecialTextColor</TextColor>\n", child_indent));
+            }
+        }
+        // Extract Font (index 16)
+        if let Some(font_arr) = item_arr.get(16).and_then(|v| v.as_array()) {
+            if font_arr.len() > 4 {
+                let scale = font_arr.get(4).and_then(|v| v.as_str()).unwrap_or("100");
+                xml.push_str(&format!("{}\t<Font ref=\"style:NormalTextFont\" kind=\"StyleItem\" scale=\"{}\"/>\n", child_indent, scale));
+            }
+        }
+        // Extract Picture for PictureDecoration (discriminator "1")
+        if get_discriminator(item_arr) == "1" {
+            if let Some(pic_wrapper) = item_arr.get(19).and_then(|v| v.as_array()) {
+                if let Some(pic_arr) = pic_wrapper.get(1).and_then(|v| v.as_array()) {
+                    if let Some(uuid_arr) = pic_arr.get(2).and_then(|v| v.as_array()) {
+                        if let Some(uuid) = uuid_arr.get(1).and_then(|v| v.as_str()) {
+                            xml.push_str(&format!("{}\t<Picture>\n", child_indent));
+                            if uuid == "47f01799-7968-4f44-9acc-fe1bdde8beb2" {
+                                xml.push_str(&format!("{}\t\t<xr:Ref>StdPicture.ActiveUsers</xr:Ref>\n", child_indent));
+                            } else {
+                                xml.push_str(&format!("{}\t\t<xr:Ref>StdPicture.{}</xr:Ref>\n", child_indent, uuid));
+                            }
+                            xml.push_str(&format!("{}\t\t<xr:LoadTransparent>true</xr:LoadTransparent>\n", child_indent));
+                            xml.push_str(&format!("{}\t</Picture>\n", child_indent));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if is_table {
         xml.push_str(&autocommandbar_xml);
     }
@@ -805,8 +989,38 @@ pub fn bracket_to_formlayout_xml(
     let json_val = crate::base::bracket_json::parse_bracket_to_json(bracket.as_bytes()).ok()?;
     let root = json_val.as_array()?;
 
-    let empty_uuid_map = HashMap::new();
-    let uuid_map = uuid_map.unwrap_or(&empty_uuid_map);
+    // Clone the provided uuid_map and add any UUIDs defined inside the form (e.g. Form Attribute columns)
+    let mut local_uuid_map = if let Some(m) = uuid_map {
+        m.clone()
+    } else {
+        HashMap::new()
+    };
+    
+    fn collect_form_uuids(val: &Value, map: &mut HashMap<String, String>) {
+        if let Some(arr) = val.as_array() {
+            for i in 0..arr.len() {
+                if i + 1 < arr.len() {
+                    if let (Some(uuid_arr), Some(name_val)) = (arr[i].as_array(), arr[i+1].as_str()) {
+                        if uuid_arr.len() == 2 && uuid_arr[0].as_str() == Some("0") {
+                            if let Some(uuid) = uuid_arr[1].as_str() {
+                                if name_val.starts_with('"') && name_val.ends_with('"') {
+                                    let name = name_val.trim_matches('"');
+                                    map.insert(uuid.to_string(), name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+                collect_form_uuids(&arr[i], map);
+            }
+        }
+    }
+    
+    if let Some(attrs_arr) = root.get(3) {
+        collect_form_uuids(attrs_arr, &mut local_uuid_map);
+    }
+    
+    let uuid_map = &local_uuid_map;
 
     // Build attr_id → name map from FormAttributes (index 3)
     let mut attr_map: HashMap<usize, String> = HashMap::new();

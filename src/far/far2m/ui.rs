@@ -244,24 +244,21 @@ pub fn show_settings_dialog(settings: &PluginSettings) -> Option<PluginSettings>
             },
         ];
 
-        let h_dlg = if let Some(di) = api.DialogInit {
-            di(
-                module_number,
-                -1,
-                -1,
-                64,
-                17,
-                ptr::null(), // HelpTopic
-                items.as_mut_ptr(),
-                items.len() as u32,
-                0,
-                0,
-                None,
-                0,
-            )
-        } else {
-            return None;
-        };
+        let di = api.DialogInit?;
+        let h_dlg = di(
+            module_number,
+            -1,
+            -1,
+            64,
+            17,
+            ptr::null(), // HelpTopic
+            items.as_mut_ptr(),
+            items.len() as u32,
+            0,
+            0,
+            None,
+            0,
+        );
 
         if h_dlg.is_null() || h_dlg == INVALID_HANDLE_VALUE || h_dlg as usize == 0xFFFFFFFF {
             log::error!(

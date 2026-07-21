@@ -147,11 +147,12 @@ pub fn tc27_type_to_xml(type_arr: &[Value]) -> String {
         }
         "B" => "<v8:Type>xs:boolean</v8:Type>".to_string(),
         "D" => {
-            let date_fracs = type_arr.get(1).and_then(|v| v.as_str()).unwrap_or("0");
+            let date_fracs = type_arr.get(1).and_then(|v| v.as_str());
             let df_str = match date_fracs {
-                "0" => "Date",
-                "1" => "Time",
-                "3" => "DateTime",
+                Some("1") => "Date",
+                Some("2") => "Time",
+                Some("3") => "DateTime",
+                // By default, if not specified (or 0), 1C uses DateTime
                 _ => "DateTime",
             };
             format!(
@@ -218,10 +219,40 @@ pub fn gen_attribute_xml(tc27_arr: &[Value], is_ts_child: bool) -> Option<String
         format!("\t\t\t\t\t<Comment>{}</Comment>", comment)
     };
 
+    let type_pattern = type_inner
+        .first()
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim_matches('"');
+    let fill_val = match type_pattern {
+        "S" => "<FillValue xsi:type=\"xs:string\"/>".to_string(),
+        "N" => "<FillValue xsi:type=\"xs:decimal\">0</FillValue>".to_string(),
+        "D" => "<FillValue xsi:type=\"xs:dateTime\">0001-01-01T00:00:00</FillValue>".to_string(),
+        "B" => "<FillValue xsi:type=\"xs:boolean\">false</FillValue>".to_string(),
+        "#" => {
+            let uuid = type_inner
+                .get(1)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim_matches('"');
+            if uuid == "e603103e-a318-4edc-a014-b1c6cf94d49f" {
+                "<FillValue xmlns:mxl=\"http://v8.1c.ru/8.2/data/spreadsheet\" xsi:type=\"mxl:SpreadsheetDocument\"/>".to_string()
+            } else if uuid == "2fdc88ec-7c9b-43cd-8ba5-873f043bdd88" {
+                "<FillValue xsi:type=\"v8:StandardPeriod\"/>".to_string()
+            } else {
+                "<FillValue xsi:nil=\"true\"/>".to_string()
+            }
+        }
+        _ => "<FillValue xsi:nil=\"true\"/>".to_string(),
+    };
+
     let fill_prefix = if is_ts_child {
-        "\t\t\t\t\t<FillFromFillingValue>false</FillFromFillingValue>\n\t\t\t\t\t<FillValue xsi:nil=\"true\"/>\n"
+        format!(
+            "\t\t\t\t\t<FillFromFillingValue>false</FillFromFillingValue>\n\t\t\t\t\t{}\n",
+            fill_val
+        )
     } else {
-        ""
+        "".to_string()
     };
 
     let xml = format!(
@@ -422,94 +453,46 @@ pub fn extract_epf_child_objects(
     children
 }
 
+fn collect_uuid_names(val: &Value, map: &mut HashMap<String, String>) {
+    if let Some(arr) = val.as_array() {
+        if let Some(tc) = arr.first().and_then(|v| v.as_str()) {
+            if tc == "27" {
+                if let Some(uuid) = extract_tc27_uuid(arr) {
+                    let name = extract_tc27_name(arr).unwrap_or_else(|| "Attribute".to_string());
+                    if !uuid.is_empty() {
+                        map.insert(uuid, name);
+                    }
+                }
+            } else if tc == "11" {
+                if let Some(definition) = arr.get(5).and_then(|v| v.as_array()) {
+                    if let Some(props) = definition.get(1).and_then(|v| v.as_array()) {
+                        if let Some(uuid_data) = props.get(1).and_then(|v| v.as_array()) {
+                            if let Some(uuid) = uuid_data.get(2).and_then(|v| v.as_str()) {
+                                let uuid = uuid.trim_matches('"').to_string();
+                                let name = props
+                                    .get(2)
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.trim_matches('"').to_string())
+                                    .unwrap_or_else(|| "TabularSection".to_string());
+                                if !uuid.is_empty() {
+                                    map.insert(uuid, name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for child in arr {
+            collect_uuid_names(child, map);
+        }
+    }
+}
+
 /// Extract a UUID→name map from EPF header bracket data.
 pub fn extract_epf_uuid_name_map(json_val: &Value) -> HashMap<String, String> {
     let mut map = HashMap::new();
-    let root = match json_val.as_array() {
-        Some(r) => r,
-        None => return map,
-    };
-    let inner = match root.get(3).and_then(|v| v.as_array()) {
-        Some(a) => a,
-        None => return map,
-    };
-    let data = match inner.get(1).and_then(|v| v.as_array()) {
-        Some(a) => a,
-        None => return map,
-    };
-
-    for idx in 3..data.len() {
-        let group = match data.get(idx).and_then(|v| v.as_array()) {
-            Some(g) => g,
-            None => continue,
-        };
-        let type_uuid = match group.first().and_then(|v| v.as_str()) {
-            Some(u) => u,
-            None => continue,
-        };
-        match type_uuid {
-            EPF_FORM_ATTRIBUTES_UUID => {
-                for i in 2..group.len() {
-                    if let Some(inst) = group.get(i).and_then(|v| v.as_array()) {
-                        if let Some(inner_arr) = inst.first().and_then(|v| v.as_array()) {
-                            if let Some(tc27) = inner_arr.get(1).and_then(|v| v.as_array()) {
-                                let tc = tc27.first().and_then(|v| v.as_str()).unwrap_or("");
-                                if tc == "27" {
-                                    if let Some(uuid) = extract_tc27_uuid(tc27) {
-                                        let name = extract_tc27_name(tc27)
-                                            .unwrap_or_else(|| "Attribute".to_string());
-                                        map.insert(uuid, name);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            EPF_TABULAR_SECTIONS_UUID => {
-                for i in 2..group.len() {
-                    if let Some(inst) = group.get(i).and_then(|v| v.as_array()) {
-                        if let Some(inner_arr) = inst.first().and_then(|v| v.as_array()) {
-                            if let Some(tc_data) = inner_arr.get(1).and_then(|v| v.as_array()) {
-                                let tc = tc_data.first().and_then(|v| v.as_str()).unwrap_or("");
-                                if tc == "11" {
-                                    if let Some(definition) =
-                                        tc_data.get(5).and_then(|v| v.as_array())
-                                    {
-                                        if let Some(props) =
-                                            definition.get(1).and_then(|v| v.as_array())
-                                        {
-                                            if let Some(uuid_data) =
-                                                props.get(1).and_then(|v| v.as_array())
-                                            {
-                                                if let Some(uuid) =
-                                                    uuid_data.get(2).and_then(|v| v.as_str())
-                                                {
-                                                    let uuid = uuid.trim_matches('"').to_string();
-                                                    let name = props
-                                                        .get(2)
-                                                        .and_then(|v| v.as_str())
-                                                        .map(|s| s.trim_matches('"').to_string())
-                                                        .unwrap_or_else(|| {
-                                                            "TabularSection".to_string()
-                                                        });
-                                                    if !uuid.is_empty() {
-                                                        map.insert(uuid, name);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
+    collect_uuid_names(json_val, &mut map);
     map
 }
 

@@ -13,6 +13,7 @@ pub struct EdtStyle;
 /// Build VFS entries for subordinate groups (EDT style — same as Json).
 fn build_subordinate_entries_edt(
     groups: &[metadata_parser::SubordinateGroupResolved],
+    packed_map: &HashMap<String, bool>,
 ) -> Vec<VfsEntry> {
     let mut entries = Vec::new();
 
@@ -39,8 +40,13 @@ fn build_subordinate_entries_edt(
                         is_protected: is_prot,
                         origin_row_id: Some(obj.body_key.clone()),
                         original_container: orig_cont,
+                        origin_row_packed: metadata_parser::lookup_packed(
+                            packed_map,
+                            Some(&obj.body_key),
+                        ),
                     }],
                     origin_row_id: Some(obj.uuid.clone()),
+                    origin_row_packed: None,
                 });
             } else {
                 let data = obj.body_data.clone().unwrap_or_default();
@@ -50,6 +56,10 @@ fn build_subordinate_entries_edt(
                     is_protected: false,
                     origin_row_id: Some(obj.body_key.clone()),
                     original_container: None,
+                    origin_row_packed: metadata_parser::lookup_packed(
+                        packed_map,
+                        Some(&obj.body_key),
+                    ),
                 });
             }
         }
@@ -59,6 +69,7 @@ fn build_subordinate_entries_edt(
                 name: group.display_name.clone(),
                 children,
                 origin_row_id: None,
+                origin_row_packed: None,
             });
         }
     }
@@ -66,7 +77,10 @@ fn build_subordinate_entries_edt(
 }
 
 /// Build VFS for a single EPF/ERF object (EDT style).
-fn build_single_object_vfs_edt(metadata: &metadata_parser::ContainerMetadata) -> Vec<VfsEntry> {
+fn build_single_object_vfs_edt(
+    metadata: &metadata_parser::ContainerMetadata,
+    packed_map: &HashMap<String, bool>,
+) -> Vec<VfsEntry> {
     let mut vfs = Vec::new();
 
     if let Some(obj) = metadata.objects.first() {
@@ -78,18 +92,28 @@ fn build_single_object_vfs_edt(metadata: &metadata_parser::ContainerMetadata) ->
                 data: module.text.clone(),
                 origin_row_id: module.origin_row_id.clone(),
                 original_container: module.original_container.clone(),
+                origin_row_packed: metadata_parser::lookup_packed(
+                    packed_map,
+                    module.origin_row_id.as_deref(),
+                ),
             });
         }
 
         // Subordinate entries
-        vfs.extend(build_subordinate_entries_edt(&obj.subordinate_groups));
+        vfs.extend(build_subordinate_entries_edt(
+            &obj.subordinate_groups,
+            packed_map,
+        ));
     }
 
     vfs
 }
 
 /// Build VFS for configuration/extension (EDT style).
-fn build_configuration_vfs_edt(metadata: &metadata_parser::ContainerMetadata) -> Vec<VfsEntry> {
+fn build_configuration_vfs_edt(
+    metadata: &metadata_parser::ContainerMetadata,
+    packed_map: &HashMap<String, bool>,
+) -> Vec<VfsEntry> {
     let mut vfs = Vec::new();
 
     for type_group in &metadata.type_groups {
@@ -106,16 +130,24 @@ fn build_configuration_vfs_edt(metadata: &metadata_parser::ContainerMetadata) ->
                     data: module.text.clone(),
                     origin_row_id: module.origin_row_id.clone(),
                     original_container: module.original_container.clone(),
+                    origin_row_packed: metadata_parser::lookup_packed(
+                        packed_map,
+                        module.origin_row_id.as_deref(),
+                    ),
                 });
             }
 
             // Subordinate entries
-            obj_children.extend(build_subordinate_entries_edt(&obj.subordinate_groups));
+            obj_children.extend(build_subordinate_entries_edt(
+                &obj.subordinate_groups,
+                packed_map,
+            ));
 
             obj_entries.push(VfsEntry::Dir {
                 name: obj.name.clone(),
                 children: obj_children,
                 origin_row_id: Some(obj.uuid.clone()),
+                origin_row_packed: None,
             });
         }
 
@@ -124,6 +156,7 @@ fn build_configuration_vfs_edt(metadata: &metadata_parser::ContainerMetadata) ->
                 name: type_group.display_name.clone(),
                 children: obj_entries,
                 origin_row_id: None,
+                origin_row_packed: None,
             });
         }
     }
@@ -135,15 +168,16 @@ impl PresentationStyle for EdtStyle {
     fn build_vfs(
         &self,
         rows_map: &HashMap<String, Vec<u8>>,
+        packed_map: &HashMap<String, bool>,
     ) -> Result<Vec<VfsEntry>, BuildVfsError> {
         // Step 1: Parse container into objects
         let metadata = metadata_parser::parse_container(rows_map)?;
 
-        // Step 2: Build base VFS tree from objects
+        // Step 2: Build base VFS tree from objects, propagating per-row packed flag.
         let mut vfs = match metadata.container_type {
-            ContainerType::SingleObject => build_single_object_vfs_edt(&metadata),
-            ContainerType::Configuration => build_configuration_vfs_edt(&metadata),
-            ContainerType::Extension => build_configuration_vfs_edt(&metadata),
+            ContainerType::SingleObject => build_single_object_vfs_edt(&metadata, packed_map),
+            ContainerType::Configuration => build_configuration_vfs_edt(&metadata, packed_map),
+            ContainerType::Extension => build_configuration_vfs_edt(&metadata, packed_map),
         };
 
         // Sort extension groups
@@ -161,38 +195,14 @@ impl PresentationStyle for EdtStyle {
                         is_protected: false,
                         origin_row_id: Some(id.clone()),
                         original_container: None,
+                        origin_row_packed: packed_map.get(id).copied(),
                     });
                 }
             }
         }
 
         // Step 3: Serialize remaining rows to Configuration.mdo (EDT format)
-        let mut used_ids = metadata.used_row_ids;
-        fn collect_used(entries: &[VfsEntry], used: &mut std::collections::HashSet<String>) {
-            for e in entries {
-                match e {
-                    VfsEntry::File {
-                        origin_row_id: Some(id),
-                        ..
-                    } => {
-                        used.insert(id.clone());
-                    }
-                    VfsEntry::Dir {
-                        origin_row_id: Some(id),
-                        children,
-                        ..
-                    } => {
-                        used.insert(id.clone());
-                        collect_used(children, used);
-                    }
-                    VfsEntry::Dir { children, .. } => {
-                        collect_used(children, used);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        collect_used(&vfs, &mut used_ids);
+        let used_ids = crate::v8::styles::rewrap::collect_used_row_ids(&vfs, metadata.used_row_ids);
 
         // Build Configuration.mdo from remaining bracket strings
         let mut index_obj = serde_json::Map::new();
@@ -207,6 +217,7 @@ impl PresentationStyle for EdtStyle {
                         is_protected: false,
                         origin_row_id: Some(id.clone()),
                         original_container: None,
+                        origin_row_packed: packed_map.get(id).copied(),
                     });
                 }
             }
@@ -225,6 +236,7 @@ impl PresentationStyle for EdtStyle {
                     is_protected: false,
                     origin_row_id: None,
                     original_container: None,
+                    origin_row_packed: None,
                 });
             }
         }
@@ -232,12 +244,21 @@ impl PresentationStyle for EdtStyle {
         Ok(vfs)
     }
 
-    fn sync_vfs_to_rows(&self, vfs: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>>) {
-        sync_nodes_to_map_edt(vfs, updates);
+    fn sync_vfs_to_rows(
+        &self,
+        vfs: &[VfsEntry],
+        updates: &mut HashMap<String, Vec<u8>>,
+        packed_out: &mut HashMap<String, bool>,
+    ) {
+        sync_nodes_to_map_edt(vfs, updates, packed_out);
     }
 }
 
-pub fn sync_nodes_to_map_edt(entries: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>>) {
+pub fn sync_nodes_to_map_edt(
+    entries: &[VfsEntry],
+    updates: &mut HashMap<String, Vec<u8>>,
+    packed_out: &mut HashMap<String, bool>,
+) {
     for entry in entries {
         match entry {
             VfsEntry::File {
@@ -245,6 +266,7 @@ pub fn sync_nodes_to_map_edt(entries: &[VfsEntry], updates: &mut HashMap<String,
                 data,
                 origin_row_id,
                 original_container,
+                origin_row_packed,
                 ..
             } => {
                 if name == "Configuration.mdo" {
@@ -260,7 +282,9 @@ pub fn sync_nodes_to_map_edt(entries: &[VfsEntry], updates: &mut HashMap<String,
                                         if let Ok(bracket_bytes) =
                                             crate::base::bracket_json::serialize_json_to_bracket(v)
                                         {
+                                            // JSON-recovered bracket strings are never deflate-compressed.
                                             updates.insert(k.clone(), bracket_bytes);
+                                            packed_out.insert(k.clone(), false);
                                         }
                                     }
                                 }
@@ -268,32 +292,24 @@ pub fn sync_nodes_to_map_edt(entries: &[VfsEntry], updates: &mut HashMap<String,
                         }
                     }
                 } else if let Some(row_id) = origin_row_id {
-                    let mut final_data = data.clone();
-                    if let Some(orig_cont) = original_container {
-                        // Smart re-wrap: use original container as template
-                        if let Ok(mut nested_rows) = crate::v8::container::read_container_rows(
-                            crate::base::reader::StringReader::new(orig_cont.clone()),
-                            0,
-                        ) {
-                            nested_rows.insert("text".to_string(), (data.clone(), false));
-                            let mut writer = crate::v8::writer::ContainerWriter::new(512, false);
-                            writer.use_triplets = true;
-                            writer.pad_pt_to_page = false;
-                            writer.revision = 6;
-                            let mut buffer = Vec::new();
-                            if writer
-                                .write(&mut buffer, &nested_rows, None::<fn(usize, usize)>)
-                                .is_ok()
-                            {
-                                final_data = buffer;
-                            }
+                    // Preserve the original row packed flag across the re-wrap; the
+                    // top-level writer will deflate the resulting container blob if
+                    // and only if the original row was deflate-compressed.
+                    let final_packed = origin_row_packed.unwrap_or(false);
+                    let final_data = if let Some(orig_cont) = original_container {
+                        match crate::v8::styles::rewrap::smart_rewrap_module(orig_cont, data) {
+                            Some(buffer) => buffer,
+                            None => data.clone(),
                         }
-                    }
+                    } else {
+                        data.clone()
+                    };
                     updates.insert(row_id.clone(), final_data);
+                    packed_out.insert(row_id.clone(), final_packed);
                 }
             }
             VfsEntry::Dir { children, .. } => {
-                sync_nodes_to_map_edt(children, updates);
+                sync_nodes_to_map_edt(children, updates, packed_out);
             }
         }
     }

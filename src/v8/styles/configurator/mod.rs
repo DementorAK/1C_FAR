@@ -18,6 +18,7 @@ fn build_subordinate_entries_configurator(
     parent_name: &str,
     parent_type: &str,
     uuid_map: &HashMap<String, String>,
+    packed_map: &HashMap<String, bool>,
 ) -> Vec<VfsEntry> {
     let mut entries = Vec::new();
 
@@ -38,6 +39,10 @@ fn build_subordinate_entries_configurator(
                         is_protected: false,
                         origin_row_id: Some(obj.uuid.clone()),
                         original_container: None,
+                        origin_row_packed: metadata_parser::lookup_packed(
+                            packed_map,
+                            Some(&obj.uuid),
+                        ),
                     });
                 }
             }
@@ -69,6 +74,10 @@ fn build_subordinate_entries_configurator(
                             is_protected: false,
                             origin_row_id: Some(obj.body_key.clone()),
                             original_container: orig_cont.clone(),
+                            origin_row_packed: metadata_parser::lookup_packed(
+                                packed_map,
+                                Some(&obj.body_key),
+                            ),
                         });
 
                         if let Some(module_str) = form_module_content {
@@ -79,11 +88,16 @@ fn build_subordinate_entries_configurator(
                                     is_protected: false,
                                     origin_row_id: Some(obj.body_key.clone()),
                                     original_container: orig_cont.clone(),
+                                    origin_row_packed: metadata_parser::lookup_packed(
+                                        packed_map,
+                                        Some(&obj.body_key),
+                                    ),
                                 }];
                                 ext_children.push(VfsEntry::Dir {
                                     name: "Form".to_string(),
                                     children: module_ext_children,
                                     origin_row_id: None,
+                                    origin_row_packed: None,
                                 });
                             }
                         }
@@ -96,6 +110,10 @@ fn build_subordinate_entries_configurator(
                             is_protected: is_prot,
                             origin_row_id: Some(obj.body_key.clone()),
                             original_container: orig_cont,
+                            origin_row_packed: metadata_parser::lookup_packed(
+                                packed_map,
+                                Some(&obj.body_key),
+                            ),
                         });
                     }
                 }
@@ -106,8 +124,10 @@ fn build_subordinate_entries_configurator(
                             name: "Ext".to_string(),
                             children: ext_children,
                             origin_row_id: None,
+                            origin_row_packed: None,
                         }],
                         origin_row_id: None,
+                        origin_row_packed: None,
                     });
                 }
             } else if group.display_name == "Templates" {
@@ -122,6 +142,10 @@ fn build_subordinate_entries_configurator(
                             is_protected: false,
                             origin_row_id: Some(obj.body_key.clone()),
                             original_container: None,
+                            origin_row_packed: metadata_parser::lookup_packed(
+                                packed_map,
+                                Some(&obj.body_key),
+                            ),
                         });
                     } else {
                         ext_children.push(VfsEntry::File {
@@ -130,6 +154,10 @@ fn build_subordinate_entries_configurator(
                             is_protected: false,
                             origin_row_id: Some(obj.body_key.clone()),
                             original_container: None,
+                            origin_row_packed: metadata_parser::lookup_packed(
+                                packed_map,
+                                Some(&obj.body_key),
+                            ),
                         });
                     }
                     children.push(VfsEntry::Dir {
@@ -138,8 +166,10 @@ fn build_subordinate_entries_configurator(
                             name: "Ext".to_string(),
                             children: ext_children,
                             origin_row_id: None,
+                            origin_row_packed: None,
                         }],
                         origin_row_id: None,
+                        origin_row_packed: None,
                     });
                 }
             } else {
@@ -155,10 +185,16 @@ fn build_subordinate_entries_configurator(
                                 is_protected: false,
                                 origin_row_id: Some(obj.body_key.clone()),
                                 original_container: None,
+                                origin_row_packed: metadata_parser::lookup_packed(
+                                    packed_map,
+                                    Some(&obj.body_key),
+                                ),
                             }],
                             origin_row_id: None,
+                            origin_row_packed: None,
                         }],
                         origin_row_id: None,
+                        origin_row_packed: None,
                     });
                 }
             }
@@ -169,6 +205,7 @@ fn build_subordinate_entries_configurator(
                 name: group.display_name.clone(),
                 children,
                 origin_row_id: None,
+                origin_row_packed: None,
             });
         }
     }
@@ -179,6 +216,7 @@ fn build_subordinate_entries_configurator(
 fn build_single_object_vfs_configurator(
     rows_map: &HashMap<String, Vec<u8>>,
     metadata: &metadata_parser::ContainerMetadata,
+    packed_map: &HashMap<String, bool>,
 ) -> Vec<VfsEntry> {
     let mut vfs = Vec::new();
 
@@ -203,28 +241,18 @@ fn build_single_object_vfs_configurator(
 
         // Create root XML file
         if let Some(root_data) = rows_map.get(&obj.uuid) {
-            // Determine class name from bracket header
+            // Determine class name from bracket header: read class_id at path [3][0]
+            // directly from the bracket AST — no JSON intermediate.
+            // ExternalReport UUID: "e41aff26-25cf-4bb6-b6c1-3f478a75f374"
+            // ExternalDataProcessor UUID: any other value.
             let class_name = {
-                if let Ok(json_val2) = crate::base::bracket_json::parse_bracket_to_json(root_data) {
-                    if let Some(root) = json_val2.as_array() {
-                        if let Some(inner) = root.get(3).and_then(|v| v.as_array()) {
-                            if let Some(cid) = inner.first().and_then(|s| s.as_str()) {
-                                if cid == "e41aff26-25cf-4bb6-b6c1-3f478a75f374" {
-                                    "ExternalReport"
-                                } else {
-                                    "ExternalDataProcessor"
-                                }
-                            } else {
-                                "ExternalDataProcessor"
-                            }
-                        } else {
-                            "ExternalDataProcessor"
-                        }
-                    } else {
-                        "ExternalDataProcessor"
-                    }
-                } else {
-                    "ExternalDataProcessor"
+                let root_str = metadata_parser::data_to_string(root_data);
+                let class_id = root_str
+                    .and_then(|s| crate::base::parser::StructParser::new(s.to_string()).ok())
+                    .and_then(|p| p.get_leaf(&[3, 0]).map(|s| s.to_string()));
+                match class_id.as_deref().map(crate::base::parser::strip_quotes) {
+                    Some("e41aff26-25cf-4bb6-b6c1-3f478a75f374") => "ExternalReport",
+                    _ => "ExternalDataProcessor",
                 }
             };
 
@@ -257,6 +285,7 @@ fn build_single_object_vfs_configurator(
                     is_protected: false,
                     origin_row_id: Some(obj.uuid.clone()),
                     original_container: None,
+                    origin_row_packed: metadata_parser::lookup_packed(packed_map, Some(&obj.uuid)),
                 });
             }
         }
@@ -275,8 +304,13 @@ fn build_single_object_vfs_configurator(
                     data: module.text.clone(),
                     origin_row_id: module.origin_row_id.clone(),
                     original_container: module.original_container.clone(),
+                    origin_row_packed: metadata_parser::lookup_packed(
+                        packed_map,
+                        module.origin_row_id.as_deref(),
+                    ),
                 }],
                 origin_row_id: None,
+                origin_row_packed: None,
             });
         }
 
@@ -286,6 +320,7 @@ fn build_single_object_vfs_configurator(
             &obj.name,
             parent_type,
             &epf_uuid_map,
+            packed_map,
         ));
 
         // Put everything inside <obj_name> folder except root XML
@@ -294,6 +329,7 @@ fn build_single_object_vfs_configurator(
                 name: obj.name.clone(),
                 children: obj_children,
                 origin_row_id: None,
+                origin_row_packed: None,
             });
         }
 
@@ -307,6 +343,7 @@ fn build_single_object_vfs_configurator(
                         is_protected: metadata_parser::is_protected_module(data),
                         origin_row_id: Some(id.clone()),
                         original_container: None,
+                        origin_row_packed: metadata_parser::lookup_packed(packed_map, Some(id)),
                     });
                 }
             }
@@ -320,6 +357,7 @@ fn build_single_object_vfs_configurator(
 fn build_configuration_vfs_configurator(
     rows_map: &HashMap<String, Vec<u8>>,
     metadata: &metadata_parser::ContainerMetadata,
+    packed_map: &HashMap<String, bool>,
 ) -> Vec<VfsEntry> {
     let mut vfs = Vec::new();
 
@@ -334,6 +372,10 @@ fn build_configuration_vfs_configurator(
                 is_protected: false,
                 origin_row_id: Some(metadata.root_uuid.clone()),
                 original_container: None,
+                origin_row_packed: metadata_parser::lookup_packed(
+                    packed_map,
+                    Some(&metadata.root_uuid),
+                ),
             });
         }
     }
@@ -358,6 +400,10 @@ fn build_configuration_vfs_configurator(
                         is_protected: false,
                         origin_row_id: Some(obj.uuid.clone()),
                         original_container: None,
+                        origin_row_packed: metadata_parser::lookup_packed(
+                            packed_map,
+                            Some(&obj.uuid),
+                        ),
                     });
                 }
             }
@@ -372,8 +418,13 @@ fn build_configuration_vfs_configurator(
                         data: module.text.clone(),
                         origin_row_id: module.origin_row_id.clone(),
                         original_container: module.original_container.clone(),
+                        origin_row_packed: metadata_parser::lookup_packed(
+                            packed_map,
+                            module.origin_row_id.as_deref(),
+                        ),
                     }],
                     origin_row_id: None,
+                    origin_row_packed: None,
                 });
             }
 
@@ -383,6 +434,7 @@ fn build_configuration_vfs_configurator(
                 &obj.name,
                 parent_type,
                 &HashMap::new(),
+                packed_map,
             ));
 
             // Fallback if children empty
@@ -394,6 +446,10 @@ fn build_configuration_vfs_configurator(
                         is_protected: metadata_parser::is_protected_module(header),
                         origin_row_id: Some(obj.uuid.clone()),
                         original_container: None,
+                        origin_row_packed: metadata_parser::lookup_packed(
+                            packed_map,
+                            Some(&obj.uuid),
+                        ),
                     });
                 }
             }
@@ -402,6 +458,7 @@ fn build_configuration_vfs_configurator(
                 name: obj.name.clone(),
                 children: obj_children,
                 origin_row_id: Some(obj.uuid.clone()),
+                origin_row_packed: None,
             });
         }
 
@@ -410,6 +467,7 @@ fn build_configuration_vfs_configurator(
                 name: type_group.display_name.clone(),
                 children: obj_entries,
                 origin_row_id: None,
+                origin_row_packed: None,
             });
         }
     }
@@ -424,6 +482,7 @@ fn build_configuration_vfs_configurator(
                     is_protected: false,
                     origin_row_id: Some(id.clone()),
                     original_container: None,
+                    origin_row_packed: metadata_parser::lookup_packed(packed_map, Some(id)),
                 });
             }
         }
@@ -436,6 +495,7 @@ impl PresentationStyle for ConfiguratorStyle {
     fn build_vfs(
         &self,
         rows_map: &HashMap<String, Vec<u8>>,
+        packed_map: &HashMap<String, bool>,
     ) -> Result<Vec<VfsEntry>, BuildVfsError> {
         // Step 1: Parse container into objects
         let metadata = metadata_parser::parse_container(rows_map)?;
@@ -443,13 +503,14 @@ impl PresentationStyle for ConfiguratorStyle {
         // Step 2: Build VFS from objects
         let mut vfs = match metadata.container_type {
             ContainerType::SingleObject => {
-                build_single_object_vfs_configurator(rows_map, &metadata)
+                build_single_object_vfs_configurator(rows_map, &metadata, packed_map)
             }
             ContainerType::Configuration => {
-                build_configuration_vfs_configurator(rows_map, &metadata)
+                build_configuration_vfs_configurator(rows_map, &metadata, packed_map)
             }
             ContainerType::Extension => {
-                let mut ext_vfs = build_configuration_vfs_configurator(rows_map, &metadata);
+                let mut ext_vfs =
+                    build_configuration_vfs_configurator(rows_map, &metadata, packed_map);
                 // Add Configuration.xml for extension root if not already present
                 if !ext_vfs.iter().any(|e| e.name() == "Configuration.xml") {
                     if let Some(root_data) = rows_map.get(&metadata.root_uuid) {
@@ -464,6 +525,10 @@ impl PresentationStyle for ConfiguratorStyle {
                                 is_protected: false,
                                 origin_row_id: Some(metadata.root_uuid.clone()),
                                 original_container: None,
+                                origin_row_packed: metadata_parser::lookup_packed(
+                                    packed_map,
+                                    Some(&metadata.root_uuid),
+                                ),
                             });
                         }
                     }
@@ -484,6 +549,7 @@ impl PresentationStyle for ConfiguratorStyle {
                         is_protected: false,
                         origin_row_id: Some(id.clone()),
                         original_container: None,
+                        origin_row_packed: metadata_parser::lookup_packed(packed_map, Some(id)),
                     });
                 }
             }
@@ -492,14 +558,20 @@ impl PresentationStyle for ConfiguratorStyle {
         Ok(vfs)
     }
 
-    fn sync_vfs_to_rows(&self, vfs: &[VfsEntry], updates: &mut HashMap<String, Vec<u8>>) {
-        sync_nodes_to_map_configurator(vfs, updates);
+    fn sync_vfs_to_rows(
+        &self,
+        vfs: &[VfsEntry],
+        updates: &mut HashMap<String, Vec<u8>>,
+        packed_out: &mut HashMap<String, bool>,
+    ) {
+        sync_nodes_to_map_configurator(vfs, updates, packed_out);
     }
 }
 
 pub fn sync_nodes_to_map_configurator(
     entries: &[VfsEntry],
     updates: &mut HashMap<String, Vec<u8>>,
+    packed_out: &mut HashMap<String, bool>,
 ) {
     for entry in entries {
         match entry {
@@ -508,45 +580,39 @@ pub fn sync_nodes_to_map_configurator(
                 data,
                 origin_row_id,
                 original_container,
+                origin_row_packed,
                 ..
             } => {
+                let mut resolved_data = None;
+
                 if name.ends_with(".xml") {
                     let xml_str = String::from_utf8_lossy(data);
-                    if let Some(row_id) = origin_row_id.as_ref() {
+                    if let Some(_row_id) = origin_row_id.as_ref() {
                         if let Some(bracket_bytes) = schema::xml_to_bracket(&xml_str) {
-                            updates.insert(row_id.clone(), bracket_bytes);
+                            resolved_data = Some(bracket_bytes);
                         }
                     }
                 }
 
                 if !name.ends_with(".xml") && origin_row_id.is_some() {
-                    let row_id = origin_row_id.as_ref().unwrap();
-                    let mut final_data = data.clone();
-                    if let Some(orig_cont) = original_container {
-                        // Smart re-wrap: use original container as template
-                        if let Ok(mut nested_rows) = crate::v8::container::read_container_rows(
-                            crate::base::reader::StringReader::new(orig_cont.clone()),
-                            0,
-                        ) {
-                            nested_rows.insert("text".to_string(), (data.clone(), false));
-                            let mut writer = crate::v8::writer::ContainerWriter::new(512, false);
-                            writer.use_triplets = true;
-                            writer.pad_pt_to_page = false;
-                            writer.revision = 6;
-                            let mut buffer = Vec::new();
-                            if writer
-                                .write(&mut buffer, &nested_rows, None::<fn(usize, usize)>)
-                                .is_ok()
-                            {
-                                final_data = buffer;
-                            }
+                    let final_data = if let Some(orig_cont) = original_container {
+                        match crate::v8::styles::rewrap::smart_rewrap_module(orig_cont, data) {
+                            Some(buffer) => buffer,
+                            None => data.clone(),
                         }
-                    }
+                    } else {
+                        data.clone()
+                    };
+                    resolved_data = Some(final_data);
+                }
+
+                if let (Some(row_id), Some(final_data)) = (origin_row_id.as_ref(), resolved_data) {
                     updates.insert(row_id.clone(), final_data);
+                    packed_out.insert(row_id.clone(), origin_row_packed.unwrap_or(false));
                 }
             }
             VfsEntry::Dir { children, .. } => {
-                sync_nodes_to_map_configurator(children, updates);
+                sync_nodes_to_map_configurator(children, updates, packed_out);
             }
         }
     }

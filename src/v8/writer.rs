@@ -205,7 +205,15 @@ impl ContainerWriter {
             };
 
             let hdr_page_size = target_chunk_size;
-            let mut page = self.format_page_header(chunk_size, hdr_page_size, next_page_abs);
+            // First page carries the total document size in `full_size`;
+            // subsequent pages use chunk_size (the reader only reads
+            // `full_size` from the first page header).
+            let page_full_size = if remaining == full_size {
+                full_size
+            } else {
+                chunk_size
+            };
+            let mut page = self.format_page_header(page_full_size, hdr_page_size, next_page_abs);
             page.extend_from_slice(
                 &content[current_data_offset..current_data_offset + chunk_size as usize],
             );

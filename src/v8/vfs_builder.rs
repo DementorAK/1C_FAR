@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-use std::collections::HashMap;
 
 /// A single entry in the virtual filesystem.
 #[derive(Debug, Clone)]
@@ -10,11 +9,21 @@ pub enum VfsEntry {
         is_protected: bool,
         origin_row_id: Option<String>,
         original_container: Option<Vec<u8>>,
+        /// Whether the originating row was deflate-compressed in the container.
+        /// Preserved across the round-trip so that the writer can re-compress
+        /// the edited bytes the same way (for raw/full-parse/v8unpack styles).
+        /// None for synthetic files not backed by a container row.
+        origin_row_packed: Option<bool>,
     },
     Dir {
         name: String,
         children: Vec<VfsEntry>,
         origin_row_id: Option<String>,
+        /// Whether the originating row (container) was deflate-compressed.
+        /// Propagated from `packed_map` during `build_vfs` so that
+        /// `sync_vfs_to_rows` can set the correct packed flag for the
+        /// re-serialised container blob.
+        origin_row_packed: Option<bool>,
     },
 }
 
@@ -78,18 +87,6 @@ impl VfsEntry {
             _ => false,
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Unified entry point
-// ---------------------------------------------------------------------------
-
-/// Build VFS tree for any 1C container (EPF/ERF/CF/CFE).
-///
-/// Delegates to `ConfiguratorStyle::build_vfs` as the default style.
-pub fn build_vfs(rows_map: &HashMap<String, Vec<u8>>) -> Result<Vec<VfsEntry>, BuildVfsError> {
-    use crate::v8::styles::PresentationStyle;
-    crate::v8::styles::configurator::ConfiguratorStyle.build_vfs(rows_map)
 }
 
 // ---------------------------------------------------------------------------

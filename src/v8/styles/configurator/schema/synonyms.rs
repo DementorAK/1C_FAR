@@ -109,11 +109,13 @@ pub fn extract_all_synonyms(json_val: &Value) -> Vec<(String, String)> {
             }
         }
 
-        // EPF/ERF: root[3][1][3][1][3] (props inside type_data)
+        // EPF/ERF: root[3][1][1][3][1][3] (props inside type_data)
         if let Some(syn_arr) = root
             .get(3)
             .and_then(|v| v.as_array())
             .and_then(|a| a.get(1))
+            .and_then(|v| v.as_array())
+            .and_then(|data| data.get(1))
             .and_then(|v| v.as_array())
             .and_then(|td| td.get(3))
             .and_then(|v| v.as_array())

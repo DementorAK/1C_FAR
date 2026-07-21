@@ -2,7 +2,10 @@
 description: Full check after code edits
 ---
 
-If changes are made to the code base, it is essential to run tests, check the formatting, and check the code quality for all supported platforms:
+If changes are made to the code base, it is essential to run tests, check the formatting, and check the code quality for all supported platforms. 
+
+> [!IMPORTANT]
+> All errors, warnings, formatting discrepancies, and test failures found during these checks must be completely resolved and fixed.
 
 # Formatting
 
